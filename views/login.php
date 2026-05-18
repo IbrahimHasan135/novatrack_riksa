@@ -146,6 +146,42 @@ $auth       = \Core\Auth::getInstance();
     }
     .input-field:focus ~ .bi,
     .input-wrap:focus-within .bi { color:#1BA784; }
+
+    /* Input wrapper */
+    .input-wrap {
+        position: relative;
+    }
+
+    /* Password toggle — same look everywhere */
+    .pw-toggle {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255,255,255,.6);
+        border: 1px solid rgba(221,232,244,.8);
+        border-radius: 8px;
+        color: #8CA0B3;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 5px 7px;
+        line-height: 1;
+        transition: color .2s, background .2s, border-color .2s;
+        display: flex;
+        align-items: center;
+        z-index: 2;
+    }
+
+    .pw-toggle:hover {
+        background: rgba(255,255,255,.95);
+        border-color: #3A6EA5;
+        color: #3A6EA5;
+    }
+
+    /* Password input gets extra right-padding for the toggle button */
+    .pw-wrap .input-field {
+        padding-right: 50px !important;
+    }
     .err-msg { display:none; font-size:12px; color:#EB5757; margin-top:4px; }
     .input-wrap.has-error .input-field { border-color:#EB5757 !important; box-shadow: 0 0 0 4px rgba(235,87,87,.1) !important; }
     .input-wrap.has-error .err-msg   { display:block; }
@@ -244,10 +280,13 @@ $auth       = \Core\Auth::getInstance();
                 <!-- Password -->
                 <div class="form-group">
                     <label class="form-label" for="u_pass">Password</label>
-                    <div class="input-wrap" id="wrap-pw">
+                    <div class="input-wrap pw-wrap" id="wrap-pw">
                         <input class="input-field" type="password" id="u_pass" name="password"
                                placeholder="Masukkan password" autocomplete="current-password" required>
                         <i class="bi bi-lock"></i>
+                        <button type="button" class="pw-toggle" id="pwLoginToggle" aria-label="Toggle password visibility">
+                            <i class="bi bi-eye-slash" id="pwLoginIcon"></i>
+                        </button>
                     </div>
                     <div class="err-msg">Password wajib diisi</div>
                 </div>
@@ -308,6 +347,17 @@ $auth       = \Core\Auth::getInstance();
         this.closest('.input-wrap').classList.remove('has-error');
         alertHide();
     });
+
+    var loginToggle = document.getElementById('pwLoginToggle');
+    var loginInput  = document.getElementById('u_pass');
+    var loginIcon   = document.getElementById('pwLoginIcon');
+    if (loginToggle && loginInput && loginIcon) {
+        loginToggle.addEventListener('click', function () {
+            var visible = loginInput.type === 'text';
+            loginInput.type = visible ? 'password' : 'text';
+            loginIcon.className = 'bi ' + (visible ? 'bi-eye-slash' : 'bi-eye');
+        });
+    }
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();

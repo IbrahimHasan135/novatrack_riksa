@@ -13,8 +13,8 @@ require __DIR__ . '/../layout/header.php';
         <div class="admin-grid">
             <form class="admin-card" action="<?= app_url('roles'); ?>" method="POST">
                 <h2>Create Role</h2>
-                <label>Role Name</label>
-                <input name="name" required placeholder="Contoh: Admin Sales">
+                <label for="role_name">Role Name</label>
+                <input id="role_name" name="name" required placeholder="Contoh: Admin Sales">
                 <label>Allowed Modules</label>
                 <div class="check-grid">
                     <?php foreach ($modules as $module): ?>

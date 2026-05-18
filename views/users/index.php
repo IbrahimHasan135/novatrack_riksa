@@ -13,11 +13,20 @@ $rbac = new \Core\Rbac();
         <div class="admin-grid">
             <form class="admin-card" action="<?= app_url('users'); ?>" method="POST">
                 <h2>Create Account</h2>
-                <label>Username</label><input name="username" required>
-                <label>Full Name</label><input name="full_name" required>
-                <label>Password</label><input type="password" name="password" required>
-                <label>Role</label>
-                <select name="role" required>
+                <label for="u_username">Username</label>
+                <input id="u_username" name="username" required placeholder="Contoh: john.doe">
+                <label for="u_fullname">Full Name</label>
+                <input id="u_fullname" name="full_name" required placeholder="Contoh: John Doe">
+                <label for="u_password">Password</label>
+                <div class="pw-wrap">
+                    <input id="u_password" type="password" name="password" required placeholder="Min. 6 karakter">
+                    <button type="button" class="pw-toggle" id="pwToggle" aria-label="Toggle password visibility">
+                        <i class="bi bi-eye-slash" id="pwIcon"></i>
+                    </button>
+                </div>
+                <label for="u_role">Role</label>
+                <select id="u_role" name="role" required>
+                    <option value="">Pilih role...</option>
                     <?php foreach ($roles as $role): ?>
                         <?php if ($rbac->canCreateRoleSlug($role['slug'], $currentUser)): ?>
                             <option value="<?= htmlspecialchars($role['slug']); ?>"><?= htmlspecialchars($role['name']); ?></option>
@@ -45,5 +54,18 @@ $rbac = new \Core\Rbac();
     </section>
 </main>
 <footer class="app-footer"><span>&copy; <?= date('Y'); ?> NovaTrack Riksa</span></footer>
+<script>
+(function () {
+    var toggle = document.getElementById('pwToggle');
+    var input  = document.getElementById('u_password');
+    var icon   = document.getElementById('pwIcon');
+    if (!toggle || !input || !icon) return;
+    toggle.addEventListener('click', function () {
+        var isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        icon.className = 'bi ' + (isHidden ? 'bi-eye' : 'bi-eye-slash');
+    });
+})();
+</script>
 <?php require __DIR__ . '/../roles/styles.php'; ?>
 </body></html>
