@@ -5,10 +5,12 @@ require_once __DIR__ . '/layout/header.php';
 
 use Core\Auth;
 use Core\ModuleRegistry;
+use Core\Rbac;
 
 $auth     = Auth::getInstance();
 $user     = $auth->check() ? $auth->user() : null;
 $registry = ModuleRegistry::getInstance();
+$rbac     = new Rbac();
 ?>
 
 <!-- TOPBAR (di bawah sidebar) -->
@@ -42,7 +44,7 @@ $registry = ModuleRegistry::getInstance();
         <p class="greeting-sub">Ringkasan semua modul yang aktif hari ini.</p>
     </div>
 
-    <?php $cards = $registry->allCards(); ?>
+    <?php $cards = array_values(array_filter($registry->allCards(), fn($card) => $rbac->canAccessModule($card->module, $user))); ?>
 
     <!-- MODULE SECTIONS -->
     <?php if (empty($cards)): ?>
@@ -71,7 +73,7 @@ $registry = ModuleRegistry::getInstance();
 
             // Module menu links
             $menuItems   = $registry->allMenuItems();
-            $modMenuLinks = array_values(array_filter($menuItems, fn($m) => $m['module'] === $modSlug));
+            $modMenuLinks = array_values(array_filter($menuItems, fn($m) => $m['module'] === $modSlug && $rbac->canAccessModule($m['module'], $user)));
         ?>
         <!-- Section: <?= htmlspecialchars($modLabel); ?> -->
         <div class="module-section" data-module="<?= htmlspecialchars($modSlug); ?>">

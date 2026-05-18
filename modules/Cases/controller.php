@@ -2,10 +2,14 @@
 
 use Core\Database;
 use Core\Module;
+use Core\Auth;
+use Core\Rbac;
 
 class CasesController
 {
     private PDO $db;
+    private Rbac $rbac;
+    private ?array $user;
 
     private array $validStatuses = ['verification', 'in_progress', 'done', 'closed'];
     private array $validPriorities = ['normal', 'medium', 'high', 'critical'];
@@ -13,6 +17,8 @@ class CasesController
     public function __construct()
     {
         $this->db = Database::connection();
+        $this->rbac = new Rbac($this->db);
+        $this->user = Auth::getInstance()->user();
         $this->ensureSchema();
     }
 
@@ -29,6 +35,25 @@ class CasesController
              GROUP BY t.id
              ORDER BY t.name ASC'
         )->fetchAll();
+
+        if (!$this->rbac->canViewAllCases($this->user)) {
+            $visibleCases = $this->visibleCases();
+            $counts = [];
+            foreach ($visibleCases as $case) {
+                $typeId = (int)$case['type_id'];
+                $counts[$typeId] ??= ['case_count' => 0, 'verification_count' => 0, 'progress_count' => 0, 'done_count' => 0, 'closed_count' => 0];
+                $counts[$typeId]['case_count']++;
+                if (($case['status'] ?? '') === 'verification') $counts[$typeId]['verification_count']++;
+                if (($case['status'] ?? '') === 'in_progress') $counts[$typeId]['progress_count']++;
+                if (($case['status'] ?? '') === 'done') $counts[$typeId]['done_count']++;
+                if (($case['status'] ?? '') === 'closed') $counts[$typeId]['closed_count']++;
+            }
+            $types = array_values(array_filter(array_map(function ($type) use ($counts) {
+                $stats = $counts[(int)$type['id']] ?? null;
+                if (!$stats) return null;
+                return array_merge($type, $stats);
+            }, $types)));
+        }
 
         Module::renderView('Cases/views/index', compact('types'));
     }
@@ -75,6 +100,9 @@ class CasesController
         );
         $stmt->execute(['type_id' => $id]);
         $cases = $stmt->fetchAll();
+        if (!$this->rbac->canViewAllCases($this->user)) {
+            $cases = array_values(array_filter($cases, fn($case) => $this->rbac->isCaseAssignedToUser($case, (int)$this->user['id'])));
+        }
 
         Module::renderView('Cases/views/type', compact('type', 'cases'));
     }
@@ -83,9 +111,10 @@ class CasesController
     {
         $case = null;
         $types = $this->getTypes();
+        $users = $this->rbac->allUsers();
         $selectedTypeId = (int)($_GET['type_id'] ?? 0);
         $mode = 'create';
-        Module::renderView('Cases/views/form', compact('case', 'types', 'selectedTypeId', 'mode'));
+        Module::renderView('Cases/views/form', compact('case', 'types', 'users', 'selectedTypeId', 'mode'));
     }
 
     public function store(): void
@@ -104,9 +133,9 @@ class CasesController
 
         $stmt = $this->db->prepare(
             'INSERT INTO cases
-                (type_id, title, description, priority, status, deadline, personal_note, information, created_at)
+                (type_id, title, description, priority, status, deadline, personal_note, information, assigned_user_ids, created_at)
              VALUES
-                (:type_id, :title, :description, :priority, :status, :deadline, :personal_note, :information, NOW())'
+                (:type_id, :title, :description, :priority, :status, :deadline, :personal_note, :information, :assigned_user_ids, NOW())'
         );
         $stmt->execute([
             'type_id' => $typeId,
@@ -117,6 +146,7 @@ class CasesController
             'deadline' => $data['deadline'],
             'personal_note' => $data['personal_note'],
             'information' => $data['information'],
+            'assigned_user_ids' => $data['assigned_user_ids'],
         ]);
 
         header('Location: ' . app_url('cases/type/' . $typeId . '?created=1'));
@@ -129,11 +159,15 @@ class CasesController
             $this->notFound('Case tidak ditemukan');
             return;
         }
+        if (!$this->rbac->canViewAllCases($this->user) && !$this->rbac->isCaseAssignedToUser($case, (int)$this->user['id'])) {
+            http_response_code(403); echo '403 - Case ini tidak di-assign ke Anda'; return;
+        }
 
         $types = $this->getTypes();
+        $users = $this->rbac->allUsers();
         $selectedTypeId = (int)$case['type_id'];
         $mode = 'edit';
-        Module::renderView('Cases/views/form', compact('case', 'types', 'selectedTypeId', 'mode'));
+        Module::renderView('Cases/views/form', compact('case', 'types', 'users', 'selectedTypeId', 'mode'));
     }
 
     public function update(int $id): void
@@ -166,6 +200,7 @@ class CasesController
                  deadline = :deadline,
                  personal_note = :personal_note,
                  information = :information,
+                 assigned_user_ids = :assigned_user_ids,
                  updated_at = NOW()
              WHERE id = :id'
         );
@@ -179,6 +214,7 @@ class CasesController
             'deadline' => $data['deadline'],
             'personal_note' => $data['personal_note'],
             'information' => $data['information'],
+            'assigned_user_ids' => $data['assigned_user_ids'],
         ]);
 
         header('Location: ' . app_url('cases/detail/' . $id . '?updated=1'));
@@ -190,6 +226,9 @@ class CasesController
         if (!$case) {
             $this->notFound('Case tidak ditemukan');
             return;
+        }
+        if (!$this->rbac->canViewAllCases($this->user) && !$this->rbac->isCaseAssignedToUser($case, (int)$this->user['id'])) {
+            http_response_code(403); echo '403 - Case ini tidak di-assign ke Anda'; return;
         }
 
         $typeId = (int)$case['type_id'];
@@ -205,8 +244,12 @@ class CasesController
             $this->notFound('Case tidak ditemukan');
             return;
         }
+        if (!$this->rbac->canViewAllCases($this->user) && !$this->rbac->isCaseAssignedToUser($case, (int)$this->user['id'])) {
+            http_response_code(403); echo '403 - Case ini tidak di-assign ke Anda'; return;
+        }
 
-        Module::renderView('Cases/views/detail', compact('case'));
+        $canViewPersonalNote = $this->rbac->canViewPersonalNote($case, $this->user);
+        Module::renderView('Cases/views/detail', compact('case', 'canViewPersonalNote'));
     }
 
     private function readCaseInput(): array
@@ -222,7 +265,17 @@ class CasesController
             'deadline' => ($_POST['deadline'] ?? '') !== '' ? $_POST['deadline'] : null,
             'personal_note' => trim($_POST['personal_note'] ?? ''),
             'information' => trim($_POST['information'] ?? ''),
+            'assigned_user_ids' => json_encode(array_values(array_unique(array_map('intval', $_POST['assigned_user_ids'] ?? [])))),
         ];
+    }
+
+    private function visibleCases(): array
+    {
+        $cases = $this->db->query('SELECT * FROM cases')->fetchAll();
+        if ($this->rbac->canViewAllCases($this->user)) {
+            return $cases;
+        }
+        return array_values(array_filter($cases, fn($case) => $this->rbac->isCaseAssignedToUser($case, (int)$this->user['id'])));
     }
 
     private function resolveTypeId(): int
@@ -327,6 +380,7 @@ class CasesController
         $this->addColumnIfMissing('cases', 'deadline', 'DATE NULL AFTER status');
         $this->addColumnIfMissing('cases', 'personal_note', 'TEXT AFTER deadline');
         $this->addColumnIfMissing('cases', 'information', 'TEXT AFTER personal_note');
+        $this->addColumnIfMissing('cases', 'assigned_user_ids', 'JSON NULL AFTER reporter_id');
 
         $defaultTypeId = $this->findOrCreateType('General');
         $stmt = $this->db->prepare('UPDATE cases SET type_id = :type_id WHERE type_id IS NULL OR type_id = 0');

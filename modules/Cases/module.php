@@ -4,6 +4,7 @@ use Core\Database;
 use Core\DashboardCard;
 use Core\ModuleMeta;
 use Core\ModuleRegistry;
+use Core\Rbac;
 
 class CasesModuleMeta extends ModuleMeta
 {
@@ -70,6 +71,8 @@ class CasesModuleMeta extends ModuleMeta
                 'order' => 1,
                 'callback' => function () {
                     $db = Database::connection();
+                    $rbac = new Rbac($db);
+                    $user = \Core\Auth::getInstance()->user();
                     $rows = $db->query(
                         'SELECT t.id, t.name, COUNT(c.id) AS total,
                                 SUM(c.status = "verification") AS verification_count,
@@ -81,7 +84,27 @@ class CasesModuleMeta extends ModuleMeta
                          GROUP BY t.id
                          ORDER BY t.name ASC'
                     )->fetchAll();
-                    $total = (int)$db->query('SELECT COUNT(*) FROM cases')->fetchColumn();
+                    if (!$rbac->canViewAllCases($user)) {
+                        $allCases = $db->query('SELECT * FROM cases')->fetchAll();
+                        $visible = array_values(array_filter($allCases, fn($case) => $rbac->isCaseAssignedToUser($case, (int)$user['id'])));
+                        $counts = [];
+                        foreach ($visible as $case) {
+                            $typeId = (int)$case['type_id'];
+                            $counts[$typeId] ??= ['total' => 0, 'verification_count' => 0, 'progress_count' => 0, 'done_count' => 0, 'closed_count' => 0];
+                            $counts[$typeId]['total']++;
+                            if (($case['status'] ?? '') === 'verification') $counts[$typeId]['verification_count']++;
+                            if (($case['status'] ?? '') === 'in_progress') $counts[$typeId]['progress_count']++;
+                            if (($case['status'] ?? '') === 'done') $counts[$typeId]['done_count']++;
+                            if (($case['status'] ?? '') === 'closed') $counts[$typeId]['closed_count']++;
+                        }
+                        $rows = array_values(array_filter(array_map(function ($row) use ($counts) {
+                            $stats = $counts[(int)$row['id']] ?? null;
+                            return $stats ? array_merge($row, $stats) : null;
+                        }, $rows)));
+                        $total = count($visible);
+                    } else {
+                        $total = (int)$db->query('SELECT COUNT(*) FROM cases')->fetchColumn();
+                    }
 
                     ob_start();
                     ?>

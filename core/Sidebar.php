@@ -20,6 +20,7 @@ class Sidebar
         ob_start();
 
         $auth        = Auth::getInstance();
+        $rbac        = new Rbac();
         $user        = $auth->check() ? $auth->user() : null;
         $menuItems   = $this->registry->allMenuItems();
         $modulesList = $this->registry->allModules();
@@ -74,10 +75,26 @@ class Sidebar
                         <i class="bi bi-speedometer2"></i>
                         <span>Dashboard</span>
                     </a>
+                    <?php if ($rbac->canManageRoles($user)): ?>
+                    <a href="<?= htmlspecialchars(\app_url('roles')); ?>"
+                       class="nav-link <?= rtrim(\app_url('roles'), '/') === $currentPath ? 'active' : ''; ?>"
+                       title="Role Management">
+                        <i class="bi bi-shield-lock"></i>
+                        <span>Role Management</span>
+                    </a>
+                    <?php endif; ?>
+                    <?php if ($rbac->canManageUsers($user)): ?>
+                    <a href="<?= htmlspecialchars(\app_url('users')); ?>"
+                       class="nav-link <?= rtrim(\app_url('users'), '/') === $currentPath ? 'active' : ''; ?>"
+                       title="Users">
+                        <i class="bi bi-people"></i>
+                        <span>Users</span>
+                    </a>
+                    <?php endif; ?>
                 </div>
 
                 <?php foreach ($modulesList as $mod): ?>
-                <?php if (!$this->registry->isEnabled($mod->slug)) continue;
+                <?php if (!$this->registry->isEnabled($mod->slug) || !$rbac->canAccessModule($mod->slug, $user)) continue;
                       $items = $byModule[$mod->slug] ?? []; ?>
 
                 <div class="nav-module-group" data-module="<?= htmlspecialchars($mod->slug); ?>">
