@@ -2,43 +2,78 @@
 
 session_start();
 
-require_once 'core/Database.php';
-require_once 'core/Router.php';
-require_once 'core/Auth.php';
-require_once 'core/Module.php';
+require_once __DIR__ . '/core/Database.php';
+require_once __DIR__ . '/core/Auth.php';
+require_once __DIR__ . '/core/Router.php';
+require_once __DIR__ . '/core/Module.php';
+require_once __DIR__ . '/core/ModuleRegistry.php';
+require_once __DIR__ . '/core/Sidebar.php';
 
-$router = new Router();
-$auth = new Auth();
+use Core\Database;
+use Core\Auth;
+use Core\Module;
+use Core\Router;
+use Core\ModuleRegistry;
 
-/**
- * LOGIN CHECK
- */
+$router   = new Router();
+$auth     = Auth::getInstance();
+$registry = ModuleRegistry::getInstance();
+
+if (!function_exists('app_url')) {
+    function app_url(string $path = ''): string
+    {
+        $base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+        if ($base === '' || $base === '.') {
+            $base = '';
+        }
+
+        return $base . '/' . ltrim($path, '/');
+    }
+}
+
+/* ── BOOT ALL MODULES ───────────────────────────────────────────────── */
+Module::bootAll($registry);
+
+/* ── AUTO-MIGRATE TABLE ──────────────────────────────────────────────── */
+try {
+    Database::autoMigrate();
+} catch (Throwable $e) {}
+
+/* ── LOGIN CHECK ─────────────────────────────────────────────────────── */
 $url = $_GET['url'] ?? 'dashboard';
-
 if (!$auth->check() && $url !== 'login') {
     $url = 'login';
 }
 
-/**
- * CORE PAGES
- */
-
-$router->get('login', function () {
-    include 'views/login.php';
+/* ── CORE ROUTES ─────────────────────────────────────────────────────── */
+$router->get('login', function () use ($auth) {
+    if ($auth->check()) { header('Location: ' . app_url('dashboard')); return; }
+    require __DIR__ . '/views/login.php';
 });
 
-$router->get('dashboard', function () {
-    include 'views/dashboard.php';
+$router->post('login', function () use ($auth) {
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    header('Content-Type: application/json');
+    echo json_encode(
+        $auth->attempt($username, $password)
+            ? ['success' => true, 'redirect' => app_url('dashboard')]
+            : ['success' => false, 'message' => 'Username atau password salah']
+    );
 });
 
-/**
- * LOAD MODULE ROUTES
- */
+$router->get('logout', function () use ($auth) {
+    $auth->logout();
+    header('Location: ' . app_url('login'));
+});
 
+$router->get('dashboard', function () use ($registry, $auth) {
+    $user = $auth->user();
+    require __DIR__ . '/views/dashboard.php';
+});
+
+/* ── MODULE ROUTES ───────────────────────────────────────────────────── */
 Module::loadRoutes($router);
 
-/**
- * RUN ROUTER
- */
-
+/* ── DISPATCH ────────────────────────────────────────────────────────── */
 $router->dispatch($url);

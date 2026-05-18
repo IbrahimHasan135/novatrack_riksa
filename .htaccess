@@ -1,4 +1,5 @@
 RewriteEngine On
+RewriteBase /github/novatrack_riksa/
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
