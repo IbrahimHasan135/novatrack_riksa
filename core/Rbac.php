@@ -104,6 +104,9 @@ class Rbac
         if ($this->isSuperAdmin($user)) {
             return true;
         }
+        if ($this->isAdminLike($user) && $targetSlug !== 'super_admin') {
+            return true;
+        }
 
         $role = $this->getRoleBySlug($user['role'] ?? '');
         $target = $this->getRoleBySlug($targetSlug);
@@ -150,6 +153,23 @@ class Rbac
     public function allUsers(): array
     {
         return $this->db->query('SELECT id, username, full_name, role, created_at FROM users ORDER BY full_name ASC, username ASC')->fetchAll();
+    }
+
+    public function manageableUsers(?array $user = null): array
+    {
+        $user = $user ?: $this->auth->user();
+        if ($this->isSuperAdmin($user)) {
+            return $this->allUsers();
+        }
+        return $this->db->query('SELECT id, username, full_name, role, created_at FROM users WHERE role != "super_admin" ORDER BY full_name ASC, username ASC')->fetchAll();
+    }
+
+    public function getUser(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT id, username, full_name, role, created_at FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $user = $stmt->fetch();
+        return $user ?: null;
     }
 
     public function getRoleBySlug(string $slug): ?array
@@ -236,6 +256,83 @@ class Rbac
             'password' => password_hash($data['password'] ?? '', PASSWORD_BCRYPT),
             'full_name' => trim($data['full_name'] ?? ''),
             'role' => $role,
+        ]);
+    }
+
+    public function updateUserAccount(int $id, array $data): bool
+    {
+        if (!$this->canManageUserId($id)) {
+            return false;
+        }
+
+        $fields = [
+            'username' => trim($data['username'] ?? ''),
+            'full_name' => trim($data['full_name'] ?? ''),
+            'id' => $id,
+        ];
+        if ($fields['username'] === '' || $fields['full_name'] === '') {
+            return false;
+        }
+
+        if (trim($data['password'] ?? '') !== '') {
+            $stmt = $this->db->prepare('UPDATE users SET username = :username, full_name = :full_name, password = :password WHERE id = :id');
+            $fields['password'] = password_hash($data['password'], PASSWORD_BCRYPT);
+        } else {
+            $stmt = $this->db->prepare('UPDATE users SET username = :username, full_name = :full_name WHERE id = :id');
+        }
+
+        try {
+            return $stmt->execute($fields);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function deleteUserAccount(int $id): bool
+    {
+        $currentUser = $this->auth->user();
+        if (!$this->canManageUserId($id) || (int)($currentUser['id'] ?? 0) === $id) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('DELETE FROM users WHERE id = :id');
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function canManageUserId(int $id, ?array $user = null): bool
+    {
+        $user = $user ?: $this->auth->user();
+        if (!$this->canManageUsers($user)) {
+            return false;
+        }
+
+        $target = $this->getUser($id);
+        if (!$target) {
+            return false;
+        }
+        if (!$this->isSuperAdmin($user) && ($target['role'] ?? '') === 'super_admin') {
+            return false;
+        }
+        return true;
+    }
+
+    public function updateOwnPassword(int $userId, string $currentPassword, string $newPassword): bool
+    {
+        if (trim($newPassword) === '') {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('SELECT password FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
+        $hash = $stmt->fetchColumn();
+        if (!$hash || !password_verify($currentPassword, $hash)) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('UPDATE users SET password = :password WHERE id = :id');
+        return $stmt->execute([
+            'password' => password_hash($newPassword, PASSWORD_BCRYPT),
+            'id' => $userId,
         ]);
     }
 

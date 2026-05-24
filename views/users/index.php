@@ -10,6 +10,10 @@ $rbac = new \Core\Rbac();
     <section class="admin-shell">
         <div class="admin-hero"><div class="admin-kicker">Account Control</div><h1>Users</h1><p>Admin dapat membuat account hanya untuk role yang diizinkan oleh Super Admin.</p></div>
         <?php if (($_GET['error'] ?? '') === 'role'): ?><div class="admin-alert danger">Role tidak boleh dibuat oleh user ini, atau data tidak lengkap.</div><?php endif; ?>
+        <?php if (($_GET['error'] ?? '') === 'update'): ?><div class="admin-alert danger">Account gagal diupdate. Username mungkin sudah dipakai.</div><?php endif; ?>
+        <?php if (($_GET['error'] ?? '') === 'delete'): ?><div class="admin-alert danger">Account tidak bisa dihapus. Admin tidak bisa menghapus super admin atau akun sendiri.</div><?php endif; ?>
+        <?php if (isset($_GET['updated'])): ?><div class="admin-alert success">Account berhasil diupdate.</div><?php endif; ?>
+        <?php if (isset($_GET['deleted'])): ?><div class="admin-alert success">Account berhasil dihapus.</div><?php endif; ?>
         <div class="admin-grid">
             <form class="admin-card" action="<?= app_url('users'); ?>" method="POST">
                 <h2>Create Account</h2>
@@ -38,13 +42,21 @@ $rbac = new \Core\Rbac();
             <div class="admin-card">
                 <h2>Accounts</h2>
                 <table class="admin-table">
-                    <thead><tr><th>User</th><th>Role</th><th>Created</th></tr></thead>
+                    <thead><tr><th>User</th><th>Role</th><th>Created</th><th>Action</th></tr></thead>
                     <tbody>
                     <?php foreach ($users as $user): ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($user['full_name'] ?: $user['username']); ?></strong><br><small><?= htmlspecialchars($user['username']); ?></small></td>
                             <td><?= htmlspecialchars($user['role']); ?></td>
                             <td><?= date('d M Y', strtotime($user['created_at'] ?? 'now')); ?></td>
+                            <td>
+                                <a href="<?= app_url('users/edit/' . (int)$user['id']); ?>"><i class="bi bi-pencil-square"></i> Edit</a>
+                                <?php if ((int)$user['id'] !== (int)($currentUser['id'] ?? 0)): ?>
+                                <form action="<?= app_url('users/delete/' . (int)$user['id']); ?>" method="POST" onsubmit="return confirm('Hapus account ini?');">
+                                    <button type="submit"><i class="bi bi-trash"></i> Delete</button>
+                                </form>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

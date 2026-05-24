@@ -127,25 +127,24 @@ $auth       = \Core\Auth::getInstance();
         color:#4A5E75; text-transform:uppercase; letter-spacing:.07em; margin-bottom:5px;
     }
     .input-wrap { position:relative; }
-    .input-wrap .bi {
+    .input-wrap .field-icon {
         position:absolute; left:13px; top:50%; transform:translateY(-50%);
         color:#8CA0B3; font-size:16px; pointer-events:none;
-        transition:color .2s;
     }
     .input-field {
         width:100%; padding:11px 14px 11px 40px;
         border:2px solid #DDE8F4; border-radius:12px;
         font-size:14.5px; font-family:Inter,sans-serif;
         color:var(--nt-text,#1C2B3A); background:rgba(255,255,255,.74);
-        outline:none; transition:border-color .2s, box-shadow .2s, background .2s;
+        outline:none;
         box-sizing:border-box;
     }
     .input-field:focus {
         border-color:#1BA784; background:#fff;
         box-shadow: 0 0 0 4px rgba(27,167,132,.12);
     }
-    .input-field:focus ~ .bi,
-    .input-wrap:focus-within .bi { color:#1BA784; }
+    .input-field:focus ~ .field-icon,
+    .input-wrap:focus-within .field-icon { color:#1BA784; }
 
     /* Input wrapper */
     .input-wrap {
@@ -166,16 +165,25 @@ $auth       = \Core\Auth::getInstance();
         cursor: pointer;
         padding: 5px 7px;
         line-height: 1;
-        transition: color .2s, background .2s, border-color .2s;
         display: flex;
         align-items: center;
+        justify-content: center;
         z-index: 2;
+        width: 34px;
+        height: 30px;
     }
 
     .pw-toggle:hover {
         background: rgba(255,255,255,.95);
         border-color: #3A6EA5;
         color: #3A6EA5;
+    }
+    .pw-toggle .bi {
+        position: static;
+        transform: none;
+        pointer-events: auto;
+        font-size: 16px;
+        line-height: 1;
     }
 
     /* Password input gets extra right-padding for the toggle button */
@@ -198,7 +206,6 @@ $auth       = \Core\Auth::getInstance();
         background:linear-gradient(135deg,#3A6EA5,#1BA784);
         color:#fff; font-weight:700; font-size:15px; font-family:Inter,sans-serif;
         border:none; border-radius:12px; cursor:pointer;
-        transition:transform .2s, box-shadow .2s;
         position:relative; overflow:hidden;
     }
     .btn-login::before {
@@ -206,7 +213,7 @@ $auth       = \Core\Auth::getInstance();
         background:linear-gradient(135deg,transparent,rgba(255,255,255,.12));
         opacity:0; transition:opacity .3s;
     }
-    .btn-login:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(27,167,132,.32);}
+    .btn-login:hover{box-shadow:0 14px 34px rgba(27,167,132,.32);}
     .btn-login:hover::before{opacity:1;}
     .btn-login:active{transform:translateY(0);box-shadow:0 6px 20px rgba(58,110,165,.35);}
     .btn-login.loading .btn-label{display:none;}
@@ -272,7 +279,7 @@ $auth       = \Core\Auth::getInstance();
                     <div class="input-wrap" id="wrap-user">
                         <input class="input-field" type="text" id="u_user" name="username"
                                placeholder="Masukkan username" autocomplete="username" required minlength="3">
-                        <i class="bi bi-person"></i>
+                        <i class="bi bi-person field-icon"></i>
                     </div>
                     <div class="err-msg">Username wajib diisi (min. 3 karakter)</div>
                 </div>
@@ -283,7 +290,7 @@ $auth       = \Core\Auth::getInstance();
                     <div class="input-wrap pw-wrap" id="wrap-pw">
                         <input class="input-field" type="password" id="u_pass" name="password"
                                placeholder="Masukkan password" autocomplete="current-password" required>
-                        <i class="bi bi-lock"></i>
+                        <i class="bi bi-lock field-icon"></i>
                         <button type="button" class="pw-toggle" id="pwLoginToggle" aria-label="Toggle password visibility">
                             <i class="bi bi-eye-slash" id="pwLoginIcon"></i>
                         </button>

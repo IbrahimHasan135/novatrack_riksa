@@ -63,8 +63,12 @@
 }
 
 /* ── Inputs (shared design: rounded, teal focus) ── */
+.admin-card input:not([type]),
 .admin-card input[type=text],
 .admin-card input[type=password],
+.admin-card input[type=email],
+.admin-card input[type=number],
+.admin-card input[type=date],
 .admin-card select,
 .admin-card textarea {
     width: 100%;
@@ -76,12 +80,15 @@
     padding: 11px 13px;
     outline: none;
     box-sizing: border-box;
-    transition: border-color .2s, box-shadow .2s, background .2s;
 }
 
 /* Second block wins over Bootstrap form-control defaults */
+.admin-card input:not([type]),
 .admin-card input[type=text],
 .admin-card input[type=password],
+.admin-card input[type=email],
+.admin-card input[type=number],
+.admin-card input[type=date],
 .admin-card select,
 .admin-card textarea {
     appearance: none;
@@ -113,11 +120,9 @@
     cursor: pointer;
     font-size: 14px;
     font-family: Inter, sans-serif;
-    transition: transform .15s, box-shadow .2s;
 }
 
 .admin-card button:hover {
-    transform: translateY(-1px);
     box-shadow: 0 6px 22px rgba(27, 167, 132, .28);
 }
 
@@ -153,13 +158,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition:
-        color .18s ease,
-        background .18s ease,
-        border-color .18s ease,
-        box-shadow .18s ease;
     -webkit-user-select: none;
     user-select: none;
+    width: 32px;
+    height: 28px;
+    margin-top: 0 !important;
+}
+
+.pw-toggle .bi {
+    position: static;
+    transform: none;
+    pointer-events: auto;
+    line-height: 1;
 }
 
 .pw-toggle:hover {
@@ -192,7 +202,6 @@
     font-weight: 500;
     color: #1C2B3A;
     cursor: pointer;
-    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
     user-select: none;
 }
 
@@ -245,7 +254,6 @@
     margin-right: 4px;
     cursor: pointer;
     font-family: Inter, sans-serif;
-    transition: background .15s ease, border-color .15s ease;
 }
 
 .admin-table a:hover,

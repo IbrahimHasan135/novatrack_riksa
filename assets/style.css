@@ -318,6 +318,41 @@ body.sidebar-open   .main-content { margin-left: var(--sb-w); }
     flex-shrink: 0;
     box-shadow: 0 10px 24px rgba(27,167,132,.22);
 }
+.topbar-account { position: relative; }
+.topbar-account .topbar-avatar { border: none; padding: 0; }
+.account-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    width: 220px;
+    background: rgba(255,255,255,.96);
+    border: 1px solid rgba(58,110,165,.14);
+    border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(30,72,126,.16);
+    padding: 8px;
+    display: none;
+    z-index: 300;
+}
+.topbar-account.open .account-menu { display: block; }
+.account-menu-head {
+    padding: 9px 10px 10px;
+    border-bottom: 1px solid #EEF4FA;
+    margin-bottom: 6px;
+}
+.account-menu-name { color:#1C2B3A;font-weight:800;font-size:13px; }
+.account-menu-role { color:#68839E;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:2px; }
+.account-menu a {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:#255F8C;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:750;
+    padding:9px 10px;
+    border-radius:10px;
+}
+.account-menu a:hover { background:#F4F8FC;color:#0F6D63; }
 
 /* ── GREETING BAR ─────────────────────────────────── */
 .greeting-bar {

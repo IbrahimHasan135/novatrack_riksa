@@ -50,7 +50,7 @@ if (!$auth->check() && $url !== 'login') {
 }
 if ($auth->check()) {
     $firstSegment = explode('/', trim($url, '/'))[0] ?? '';
-    $coreSegments = ['dashboard', 'login', 'logout', 'roles', 'users', ''];
+    $coreSegments = ['dashboard', 'login', 'logout', 'roles', 'users', 'profile', ''];
     if (!in_array($firstSegment, $coreSegments, true) && !$rbac->canAccessModule($firstSegment)) {
         http_response_code(403);
         echo '403 - Module tidak tersedia untuk role Anda';
@@ -123,7 +123,7 @@ $router->post('roles/delete/{id}', function (int $id) use ($rbac) {
 
 $router->get('users', function () use ($rbac) {
     if (!$rbac->canManageUsers()) { http_response_code(403); echo '403 - Forbidden'; return; }
-    $users = $rbac->allUsers();
+    $users = $rbac->manageableUsers();
     $roles = $rbac->allRoles();
     require __DIR__ . '/views/users/index.php';
 });
@@ -132,6 +132,37 @@ $router->post('users', function () use ($rbac) {
     if (!$rbac->canManageUsers()) { http_response_code(403); echo '403 - Forbidden'; return; }
     $ok = $rbac->createUser($_POST);
     header('Location: ' . app_url('users?' . ($ok ? 'created=1' : 'error=role')));
+});
+
+$router->get('users/edit/{id}', function (int $id) use ($rbac) {
+    if (!$rbac->canManageUsers()) { http_response_code(403); echo '403 - Forbidden'; return; }
+    if (!$rbac->canManageUserId($id)) { http_response_code(403); echo '403 - Forbidden'; return; }
+    $editUser = $rbac->getUser($id);
+    if (!$editUser) { http_response_code(404); echo 'User tidak ditemukan'; return; }
+    require __DIR__ . '/views/users/edit.php';
+});
+
+$router->post('users/update/{id}', function (int $id) use ($rbac) {
+    if (!$rbac->canManageUsers()) { http_response_code(403); echo '403 - Forbidden'; return; }
+    $ok = $rbac->updateUserAccount($id, $_POST);
+    header('Location: ' . app_url('users?' . ($ok ? 'updated=1' : 'error=update')));
+});
+
+$router->post('users/delete/{id}', function (int $id) use ($rbac) {
+    if (!$rbac->canManageUsers()) { http_response_code(403); echo '403 - Forbidden'; return; }
+    $ok = $rbac->deleteUserAccount($id);
+    header('Location: ' . app_url('users?' . ($ok ? 'deleted=1' : 'error=delete')));
+});
+
+$router->get('profile', function () use ($auth) {
+    $user = $auth->user();
+    require __DIR__ . '/views/profile.php';
+});
+
+$router->post('profile/password', function () use ($rbac, $auth) {
+    $user = $auth->user();
+    $ok = $user ? $rbac->updateOwnPassword((int)$user['id'], $_POST['current_password'] ?? '', $_POST['new_password'] ?? '') : false;
+    header('Location: ' . app_url('profile?tab=password&' . ($ok ? 'updated=1' : 'error=password')));
 });
 
 /* ── MODULE ROUTES ───────────────────────────────────────────────────── */

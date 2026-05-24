@@ -27,8 +27,18 @@ $rbac     = new Rbac();
         </div>
         <div class="topbar-right">
             <span class="topbar-greeting">Halo, <strong><?= htmlspecialchars($user['full_name'] ?? 'User'); ?></strong></span>
-            <div class="topbar-avatar" title="<?= htmlspecialchars($user['role'] ?? 'user'); ?>">
-                <?= strtoupper(mb_substr($user['full_name'] ?? $user['username'] ?? 'U', 0, 1)); ?>
+            <div class="topbar-account" id="topbarAccount">
+                <button class="topbar-avatar" id="accountToggle" type="button" title="<?= htmlspecialchars($user['role'] ?? 'user'); ?>" aria-label="Account menu">
+                    <?= strtoupper(mb_substr($user['full_name'] ?? $user['username'] ?? 'U', 0, 1)); ?>
+                </button>
+                <div class="account-menu" id="accountMenu">
+                    <div class="account-menu-head">
+                        <div class="account-menu-name"><?= htmlspecialchars($user['full_name'] ?: $user['username'] ?? 'User'); ?></div>
+                        <div class="account-menu-role"><?= htmlspecialchars($user['role'] ?? 'user'); ?></div>
+                    </div>
+                    <a href="<?= app_url('profile'); ?>"><i class="bi bi-person-circle"></i> Show Profile</a>
+                    <a href="<?= app_url('profile?tab=password'); ?>"><i class="bi bi-key"></i> Edit Password</a>
+                </div>
             </div>
         </div>
     </div>
@@ -44,7 +54,13 @@ $rbac     = new Rbac();
         <p class="greeting-sub">Ringkasan semua modul yang aktif hari ini.</p>
     </div>
 
-    <?php $cards = array_values(array_filter($registry->allCards(), fn($card) => $rbac->canAccessModule($card->module, $user))); ?>
+    <?php
+    $cards = array_values(array_filter($registry->allCards(), fn($card) => $rbac->canAccessModule($card->module, $user)));
+    $cardsByModule = [];
+    foreach ($cards as $card) {
+        $cardsByModule[$card->module][] = $card;
+    }
+    ?>
 
     <!-- MODULE SECTIONS -->
     <?php if (empty($cards)): ?>
@@ -58,18 +74,12 @@ $rbac     = new Rbac();
     <?php else: ?>
 
         <?php
-        // Group cards by module to show one section per module
-        $displayedSlugs = [];
-        foreach ($cards as $card):
-            if (isset($displayedSlugs[$card->module])) continue;
-            $displayedSlugs[$card->module] = true;
-            $modInfo  = $registry->getModule($card->module);
-            $modLabel = $modInfo->label ?? ucfirst($card->module);
+        foreach ($registry->allModules() as $modInfo):
+            $modSlug = $modInfo->slug;
+            if (empty($cardsByModule[$modSlug])) continue;
+            $modLabel = $modInfo->label ?? ucfirst($modSlug);
             $modIcon  = $modInfo->icon  ?? 'bi-box';
-            $modSlug  = $card->module;
-
-            // Collect all cards for this module
-            $modCards = array_values(array_filter($cards, fn($c) => $c->module === $modSlug));
+            $modCards = $cardsByModule[$modSlug];
 
             // Module menu links
             $menuItems   = $registry->allMenuItems();
@@ -93,9 +103,6 @@ $rbac     = new Rbac();
                             <?= htmlspecialchars($ml['label']); ?>
                         </a>
                     <?php endforeach; ?>
-                    <a href="<?= app_url('cases/create'); ?>" class="dash-link ms-3" style="background:var(--nt-primary);color:#fff;border-radius:8px;padding:5px 14px;text-decoration:none;font-size:12px;font-weight:700;">
-                        <i class="bi bi-plus-lg"></i>  Tambah
-                    </a>
                 </div>
             </div>
 
@@ -133,6 +140,20 @@ $rbac     = new Rbac();
     <span class="app-footer-sep">|</span>
     <span>v1.0</span>
 </footer>
+<script>
+(function () {
+    var account = document.getElementById('topbarAccount');
+    var toggle = document.getElementById('accountToggle');
+    if (!account || !toggle) return;
+    toggle.addEventListener('click', function (event) {
+        event.stopPropagation();
+        account.classList.toggle('open');
+    });
+    document.addEventListener('click', function () {
+        account.classList.remove('open');
+    });
+})();
+</script>
 
 </body>
 </html>
