@@ -33,9 +33,17 @@ class SalesController
 
     public function leads(): void
     {
-        $rows = $this->db->query('SELECT l.*, u.full_name AS assigned_name FROM sales_leads l LEFT JOIN users u ON u.id = l.assigned_user_id ORDER BY l.created_at DESC LIMIT 100')->fetchAll();
+        $rows = $this->db->query(
+            'SELECT l.*, s.name AS service_name, u.full_name AS assigned_name
+             FROM sales_leads l
+             LEFT JOIN sales_services s ON s.id = l.service_id
+             LEFT JOIN users u ON u.id = l.assigned_user_id
+             ORDER BY l.created_at DESC
+             LIMIT 100'
+        )->fetchAll();
         $users = $this->rbac->allUsers();
-        Module::renderView('Sales/views/leads', compact('rows', 'users'));
+        $services = $this->servicesList();
+        Module::renderView('Sales/views/leads', compact('rows', 'users', 'services'));
     }
 
     public function editLead(int $id): void
@@ -43,7 +51,8 @@ class SalesController
         $lead = $this->find('sales_leads', $id);
         if (!$lead) { $this->notFound('Lead tidak ditemukan'); return; }
         $users = $this->rbac->allUsers();
-        Module::renderView('Sales/views/lead_edit', compact('lead', 'users'));
+        $services = $this->servicesList();
+        Module::renderView('Sales/views/lead_edit', compact('lead', 'users', 'services'));
     }
 
     public function opportunities(): void
@@ -144,6 +153,7 @@ class SalesController
             'phone' => trim($_POST['phone'] ?? ''),
             'email' => trim($_POST['email'] ?? ''),
             'source' => trim($_POST['source'] ?? ''),
+            'service_id' => (int)($_POST['service_id'] ?? 0) ?: null,
             'need_category' => trim($_POST['need_category'] ?? ''),
             'estimated_value' => $this->money($_POST['estimated_value'] ?? 0),
             'status' => in_array($_POST['status'] ?? 'new', $this->leadStatuses, true) ? $_POST['status'] : 'new',
@@ -152,9 +162,9 @@ class SalesController
         ];
         if ($id) {
             $data['id'] = $id;
-            $stmt = $this->db->prepare('UPDATE sales_leads SET company_name=:company_name,pic_name=:pic_name,phone=:phone,email=:email,source=:source,need_category=:need_category,estimated_value=:estimated_value,status=:status,assigned_user_id=:assigned_user_id,notes=:notes,updated_at=NOW() WHERE id=:id');
+            $stmt = $this->db->prepare('UPDATE sales_leads SET company_name=:company_name,pic_name=:pic_name,phone=:phone,email=:email,source=:source,service_id=:service_id,need_category=:need_category,estimated_value=:estimated_value,status=:status,assigned_user_id=:assigned_user_id,notes=:notes,updated_at=NOW() WHERE id=:id');
         } else {
-            $stmt = $this->db->prepare('INSERT INTO sales_leads (company_name,pic_name,phone,email,source,need_category,estimated_value,status,assigned_user_id,notes,created_at) VALUES (:company_name,:pic_name,:phone,:email,:source,:need_category,:estimated_value,:status,:assigned_user_id,:notes,NOW())');
+            $stmt = $this->db->prepare('INSERT INTO sales_leads (company_name,pic_name,phone,email,source,service_id,need_category,estimated_value,status,assigned_user_id,notes,created_at) VALUES (:company_name,:pic_name,:phone,:email,:source,:service_id,:need_category,:estimated_value,:status,:assigned_user_id,:notes,NOW())');
         }
         $stmt->execute($data);
         $leadId = $id ?: (int)$this->db->lastInsertId();
@@ -175,20 +185,28 @@ class SalesController
         }
 
         $company = trim($lead['company_name'] ?? '') ?: 'Qualified Lead';
+        $service = $this->findService((int)($lead['service_id'] ?? 0));
         $need = trim($lead['need_category'] ?? '');
-        $title = $need !== '' ? $need . ' - ' . $company : 'Opportunity - ' . $company;
+        $serviceName = trim($service['name'] ?? '');
+        $titleBase = $serviceName !== '' ? $serviceName : ($need !== '' ? $need : 'Opportunity');
+        $dealValue = $this->money($lead['estimated_value'] ?? 0);
+        if ($dealValue <= 0 && $service) {
+            $dealValue = $this->money($service['base_price'] ?? 0);
+        }
+        $title = $titleBase . ' - ' . $company;
 
         $stmt = $this->db->prepare(
             'INSERT INTO sales_opportunities
                 (lead_id, service_id, title, client_name, stage, deal_value, probability, expected_close_date, next_followup_date, assigned_user_id, lost_reason, notes, created_at)
              VALUES
-                (:lead_id, NULL, :title, :client_name, "qualification", :deal_value, 35, NULL, NULL, :assigned_user_id, "", :notes, NOW())'
+                (:lead_id, :service_id, :title, :client_name, "qualification", :deal_value, 35, NULL, NULL, :assigned_user_id, "", :notes, NOW())'
         );
         $stmt->execute([
             'lead_id' => $leadId,
             'title' => $title,
             'client_name' => $company,
-            'deal_value' => $this->money($lead['estimated_value'] ?? 0),
+            'deal_value' => $dealValue,
+            'service_id' => (int)($lead['service_id'] ?? 0) ?: null,
             'assigned_user_id' => (int)($lead['assigned_user_id'] ?? 0) ?: null,
             'notes' => trim('Auto-created from qualified lead. ' . ($lead['notes'] ?? '')),
         ]);
@@ -330,6 +348,14 @@ class SalesController
     private function simpleOpportunities(): array { return $this->db->query('SELECT id, title FROM sales_opportunities ORDER BY title ASC')->fetchAll(); }
     private function servicesList(): array { return $this->db->query('SELECT id, name, base_price FROM sales_services ORDER BY name ASC')->fetchAll(); }
 
+    private function findService(int $id): ?array
+    {
+        if ($id <= 0) {
+            return null;
+        }
+        return $this->find('sales_services', $id);
+    }
+
     private function find(string $table, int $id): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM `$table` WHERE id = :id LIMIT 1");
@@ -368,6 +394,16 @@ class SalesController
         $meta = new SalesModuleMeta();
         foreach ($meta->tables() as $schema) {
             $this->db->exec($schema);
+        }
+        $this->addColumnIfMissing('sales_leads', 'service_id', 'INT NULL AFTER source');
+    }
+
+    private function addColumnIfMissing(string $table, string $column, string $definition): void
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column');
+        $stmt->execute(['table' => $table, 'column' => $column]);
+        if ((int)$stmt->fetchColumn() === 0) {
+            $this->db->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
         }
     }
 

@@ -44,6 +44,7 @@ class SalesModuleMeta extends ModuleMeta
                 `phone` VARCHAR(80) DEFAULT "",
                 `email` VARCHAR(160) DEFAULT "",
                 `source` VARCHAR(120) DEFAULT "",
+                `service_id` INT NULL,
                 `need_category` VARCHAR(140) DEFAULT "",
                 `estimated_value` DECIMAL(15,2) DEFAULT 0,
                 `status` VARCHAR(40) DEFAULT "new",
@@ -52,6 +53,7 @@ class SalesModuleMeta extends ModuleMeta
                 `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                 `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 KEY `idx_sales_leads_status` (`status`),
+                KEY `idx_sales_leads_service` (`service_id`),
                 KEY `idx_sales_leads_assigned` (`assigned_user_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4',
             'sales_opportunities' => 'CREATE TABLE IF NOT EXISTS `sales_opportunities` (
@@ -116,8 +118,18 @@ class SalesModuleMeta extends ModuleMeta
             foreach ($this->tables() as $schema) {
                 $db->exec($schema);
             }
+            $this->addColumnIfMissing($db, 'sales_leads', 'service_id', 'INT NULL AFTER source');
             $this->seedServices($db);
         } catch (Throwable $e) {
+        }
+    }
+
+    private function addColumnIfMissing(PDO $db, string $table, string $column, string $definition): void
+    {
+        $stmt = $db->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column');
+        $stmt->execute(['table' => $table, 'column' => $column]);
+        if ((int)$stmt->fetchColumn() === 0) {
+            $db->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
         }
     }
 
