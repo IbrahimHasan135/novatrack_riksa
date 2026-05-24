@@ -9,20 +9,20 @@ $user = \Core\Auth::getInstance()->user();
 <main class="main-content">
     <section class="acct-shell">
         <div class="acct-hero">
-            <div><div class="acct-kicker"><i class="bi bi-activity"></i> Financial Intelligence</div><h1>Accounting Overview</h1><p>Monitor pemasukan, pengeluaran, piutang, recap bulanan, recap tahunan, dan sumber pemasukan paling menguntungkan.</p></div>
+            <div><div class="acct-kicker"><i class="bi bi-activity"></i> Financial Intelligence</div><h1>Accounting Overview</h1><p>Monitor pemasukan, pengeluaran, utang, recap bulanan, recap tahunan, dan sumber pemasukan paling menguntungkan.</p></div>
             <div class="acct-actions"><a class="acct-btn" href="<?= app_url('accounting/income'); ?>"><i class="bi bi-plus-circle"></i> Pemasukan</a><a class="acct-btn secondary" href="<?= app_url('accounting/expenses'); ?>"><i class="bi bi-receipt"></i> Pengeluaran</a></div>
         </div>
         <div class="acct-grid">
             <article class="acct-card acct-metric income span-3"><div class="label">Pemasukan Bulan Ini</div><div class="value"><?= nt_money($summary['income_month']); ?></div><div class="hint">Tahun ini <?= nt_money($summary['income_year']); ?></div></article>
             <article class="acct-card acct-metric expense span-3"><div class="label">Pengeluaran Bulan Ini</div><div class="value"><?= nt_money($summary['expense_month']); ?></div><div class="hint">Tahun ini <?= nt_money($summary['expense_year']); ?></div></article>
             <article class="acct-card acct-metric net span-3"><div class="label">Net Bulan Ini</div><div class="value"><?= nt_money($summary['net_month']); ?></div><div class="hint">Net tahun ini <?= nt_money($summary['net_year']); ?></div></article>
-            <article class="acct-card acct-metric debt span-3"><div class="label">Piutang Outstanding</div><div class="value"><?= nt_money($summary['receivable_open']); ?></div><div class="hint"><?= (int)$receivableStats['overdue_count']; ?> overdue</div></article>
+            <article class="acct-card acct-metric debt span-3"><div class="label">Utang Outstanding</div><div class="value"><?= nt_money($summary['receivable_open']); ?></div><div class="hint"><?= (int)$receivableStats['overdue_count']; ?> overdue · <?= (int)$summary['draft_count']; ?> draft · <?= (int)$summary['verification_count']; ?> verification</div></article>
 
             <article class="acct-card span-12">
                 <div class="acct-card-head">
                     <div>
                         <h2>Analitik Accounting</h2>
-                        <p><?= htmlspecialchars($periodMode === 'year' ? 'Recap bulanan ' . $periodLabel : 'Recap harian ' . $periodLabel); ?> untuk pemasukan, pengeluaran, net, piutang, dan top transaksi.</p>
+                        <p><?= htmlspecialchars($periodMode === 'year' ? 'Recap bulanan ' . $periodLabel : 'Recap harian ' . $periodLabel); ?> untuk pemasukan, pengeluaran, net, utang, dan top transaksi.</p>
                     </div>
                     <form class="acct-filter" action="<?= app_url('accounting'); ?>" method="GET">
                         <select name="view" id="acctPeriodMode">
@@ -67,7 +67,7 @@ $user = \Core\Auth::getInstance()->user();
             </article>
 
             <article class="acct-card span-7"><h2>Recap Bulanan</h2><div class="acct-table-wrap"><table class="acct-table"><thead><tr><th>Periode</th><th>Pemasukan</th><th>Pengeluaran</th><th>Net</th></tr></thead><tbody><?php foreach ($monthly as $row): ?><tr><td><strong><?= htmlspecialchars($row['period']); ?></strong></td><td><?= nt_money($row['income']); ?></td><td><?= nt_money($row['expense']); ?></td><td><strong><?= nt_money($row['net']); ?></strong></td></tr><?php endforeach; ?></tbody></table></div></article>
-            <article class="acct-card span-5"><h2>Piutang</h2><div class="acct-list"><div class="acct-list-row"><div><b>Total Piutang</b><br><span><?= (int)$receivableStats['total_items']; ?> item</span></div><strong><?= nt_money($receivableStats['total_amount']); ?></strong></div><div class="acct-list-row"><div><b>Outstanding</b><br><span>Belum dibayar</span></div><strong><?= nt_money($receivableStats['outstanding']); ?></strong></div><div class="acct-list-row"><div><b>Overdue</b><br><span>Butuh follow-up</span></div><strong><?= (int)$receivableStats['overdue_count']; ?></strong></div></div></article>
+            <article class="acct-card span-5"><h2>Utang</h2><div class="acct-list"><div class="acct-list-row"><div><b>Total Utang</b><br><span><?= (int)$receivableStats['total_items']; ?> item</span></div><strong><?= nt_money($receivableStats['total_amount']); ?></strong></div><div class="acct-list-row"><div><b>Outstanding</b><br><span>Belum dibayar</span></div><strong><?= nt_money($receivableStats['outstanding']); ?></strong></div><div class="acct-list-row"><div><b>Overdue</b><br><span>Butuh follow-up</span></div><strong><?= (int)$receivableStats['overdue_count']; ?></strong></div></div></article>
 
             <article class="acct-card span-6"><h2>Recap Tahunan</h2><div class="acct-table-wrap"><table class="acct-table"><thead><tr><th>Tahun</th><th>Pemasukan</th><th>Pengeluaran</th><th>Net</th></tr></thead><tbody><?php foreach ($yearly as $row): ?><tr><td><strong><?= htmlspecialchars($row['period']); ?></strong></td><td><?= nt_money($row['income']); ?></td><td><?= nt_money($row['expense']); ?></td><td><strong><?= nt_money($row['net']); ?></strong></td></tr><?php endforeach; ?></tbody></table></div></article>
             <article class="acct-card span-6"><h2>Aktivitas Terbaru</h2><div class="acct-list"><?php foreach ($recentIncomes as $row): ?><div class="acct-list-row"><div><b><?= htmlspecialchars($row['title']); ?></b><br><span><?= htmlspecialchars($row['source_name'] ?? 'Uncategorized'); ?> · <?= nt_date($row['received_date']); ?></span></div><span class="acct-pill green"><?= nt_money($row['amount']); ?></span></div><?php endforeach; ?><?php foreach ($recentExpenses as $row): ?><div class="acct-list-row"><div><b><?= htmlspecialchars($row['title']); ?></b><br><span><?= htmlspecialchars($row['category_name'] ?? 'Uncategorized'); ?> · <?= nt_date($row['expense_date']); ?></span></div><span class="acct-pill red"><?= nt_money($row['amount']); ?></span></div><?php endforeach; ?></div></article>
@@ -91,7 +91,7 @@ $user = \Core\Auth::getInstance()->user();
                 { label: 'Pemasukan', data: rows.map(function (row) { return row.income; }), borderColor: '#27AE60', backgroundColor: 'rgba(39,174,96,.12)', tension: .32, fill: false },
                 { label: 'Pengeluaran', data: rows.map(function (row) { return row.expense; }), borderColor: '#EB5757', backgroundColor: 'rgba(235,87,87,.10)', tension: .32, fill: false },
                 { label: 'Net', data: rows.map(function (row) { return row.net; }), borderColor: '#3A6EA5', backgroundColor: 'rgba(58,110,165,.12)', tension: .32, fill: true },
-                { label: 'Piutang', data: rows.map(function (row) { return row.debt; }), borderColor: '#F2994A', backgroundColor: 'rgba(242,153,74,.10)', tension: .32, fill: false }
+                { label: 'Utang', data: rows.map(function (row) { return row.debt; }), borderColor: '#F2994A', backgroundColor: 'rgba(242,153,74,.10)', tension: .32, fill: false }
             ]
         },
         options: {

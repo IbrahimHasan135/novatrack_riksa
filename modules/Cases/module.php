@@ -144,6 +144,14 @@ class CasesModuleMeta extends ModuleMeta
         ];
     }
 
+    public function listeners(): array
+    {
+        require_once __DIR__ . '/services/SalesWonListener.php';
+        return [
+            'sales.opportunity.won' => [new CasesSalesWonListener()],
+        ];
+    }
+
     public function boot(ModuleRegistry $registry): void
     {
         try {

@@ -62,6 +62,14 @@ class Module
                 }
             }
 
+            foreach ((array)$meta->listeners() as $event => $listeners) {
+                foreach ((array)$listeners as $listener) {
+                    if (is_callable($listener)) {
+                        EventBus::listen((string)$event, $listener);
+                    }
+                }
+            }
+
             // Call module boot() hook
             if (method_exists($meta, 'boot') && !$registry->isBooted($meta->slug)) {
                 $meta->boot($registry);
@@ -142,6 +150,9 @@ class ModuleMeta
 
     /** @return array<DashboardCard|array> */
     public function dashboardCards(): array { return []; }
+
+    /** @return array<string, callable[]> */
+    public function listeners(): array { return []; }
 
     /** Hook setelah module di-register */
     public function boot(ModuleRegistry $registry): void {}

@@ -13,3 +13,25 @@ if (!function_exists('nt_date')) {
         return $value ? date('d M Y', strtotime($value)) : '-';
     }
 }
+
+if (!function_exists('nt_record_state_class')) {
+    function nt_record_state_class(?string $state): string
+    {
+        return match ($state ?: 'published') {
+            'draft' => 'orange',
+            'verification' => '',
+            default => 'green',
+        };
+    }
+}
+
+if (!function_exists('nt_record_state_label')) {
+    function nt_record_state_label(?string $state): string
+    {
+        return match ($state ?: 'published') {
+            'draft' => 'Draft',
+            'verification' => 'Verification',
+            default => 'Published',
+        };
+    }
+}

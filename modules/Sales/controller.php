@@ -1,6 +1,7 @@
 <?php
 
 use Core\Database;
+use Core\EventBus;
 use Core\Module;
 use Core\Rbac;
 
@@ -156,10 +157,58 @@ class SalesController
             $stmt = $this->db->prepare('INSERT INTO sales_leads (company_name,pic_name,phone,email,source,need_category,estimated_value,status,assigned_user_id,notes,created_at) VALUES (:company_name,:pic_name,:phone,:email,:source,:need_category,:estimated_value,:status,:assigned_user_id,:notes,NOW())');
         }
         $stmt->execute($data);
+        $leadId = $id ?: (int)$this->db->lastInsertId();
+        if ($data['status'] === 'qualified') {
+            $this->createOpportunityFromQualifiedLead($leadId);
+        }
     }
 
-    private function saveOpportunity(?int $id = null): void
+    private function createOpportunityFromQualifiedLead(int $leadId): void
     {
+        if ($leadId <= 0 || $this->leadHasOpportunity($leadId)) {
+            return;
+        }
+
+        $lead = $this->find('sales_leads', $leadId);
+        if (!$lead || ($lead['status'] ?? '') !== 'qualified') {
+            return;
+        }
+
+        $company = trim($lead['company_name'] ?? '') ?: 'Qualified Lead';
+        $need = trim($lead['need_category'] ?? '');
+        $title = $need !== '' ? $need . ' - ' . $company : 'Opportunity - ' . $company;
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO sales_opportunities
+                (lead_id, service_id, title, client_name, stage, deal_value, probability, expected_close_date, next_followup_date, assigned_user_id, lost_reason, notes, created_at)
+             VALUES
+                (:lead_id, NULL, :title, :client_name, "qualification", :deal_value, 35, NULL, NULL, :assigned_user_id, "", :notes, NOW())'
+        );
+        $stmt->execute([
+            'lead_id' => $leadId,
+            'title' => $title,
+            'client_name' => $company,
+            'deal_value' => $this->money($lead['estimated_value'] ?? 0),
+            'assigned_user_id' => (int)($lead['assigned_user_id'] ?? 0) ?: null,
+            'notes' => trim('Auto-created from qualified lead. ' . ($lead['notes'] ?? '')),
+        ]);
+    }
+
+    private function leadHasOpportunity(int $leadId): bool
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM sales_opportunities WHERE lead_id = :lead_id');
+        $stmt->execute(['lead_id' => $leadId]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function saveOpportunity(?int $id = null): int
+    {
+        $oldStage = null;
+        if ($id) {
+            $old = $this->find('sales_opportunities', $id);
+            $oldStage = $old['stage'] ?? null;
+        }
+
         $data = [
             'lead_id' => (int)($_POST['lead_id'] ?? 0) ?: null,
             'service_id' => (int)($_POST['service_id'] ?? 0) ?: null,
@@ -181,6 +230,15 @@ class SalesController
             $stmt = $this->db->prepare('INSERT INTO sales_opportunities (lead_id,service_id,title,client_name,stage,deal_value,probability,expected_close_date,next_followup_date,assigned_user_id,lost_reason,notes,created_at) VALUES (:lead_id,:service_id,:title,:client_name,:stage,:deal_value,:probability,:expected_close_date,:next_followup_date,:assigned_user_id,:lost_reason,:notes,NOW())');
         }
         $stmt->execute($data);
+        $opportunityId = $id ?: (int)$this->db->lastInsertId();
+
+        if ($data['stage'] === 'won' && $oldStage !== 'won') {
+            EventBus::dispatch('sales.opportunity.won', [
+                'opportunity_id' => $opportunityId,
+            ]);
+        }
+
+        return $opportunityId;
     }
 
     private function saveService(?int $id = null): void

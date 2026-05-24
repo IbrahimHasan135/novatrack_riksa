@@ -8,6 +8,7 @@
 .acct-actions { display:flex;gap:10px;flex-wrap:wrap; }
 .acct-btn { display:inline-flex;align-items:center;gap:8px;border:none;border-radius:12px;background:linear-gradient(135deg,#3A6EA5,#1BA784);color:#fff;text-decoration:none;padding:11px 16px;font-weight:800;font-size:13px;box-shadow:0 14px 34px rgba(27,167,132,.20);cursor:pointer; }
 .acct-btn.secondary { background:#fff;color:#255F8C;border:1px solid #DDE8F4;box-shadow:none; }
+.acct-submit-row { display:flex;gap:10px;flex-wrap:wrap; }
 .acct-grid { display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:18px; }
 .acct-card { grid-column:span 12;background:rgba(255,255,255,.88);border:1px solid rgba(58,110,165,.14);border-radius:18px;padding:18px;box-shadow:0 16px 42px rgba(30,72,126,.09); }
 .acct-card.span-3 { grid-column:span 3; }

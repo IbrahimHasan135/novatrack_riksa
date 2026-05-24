@@ -9,6 +9,8 @@ require_once __DIR__ . '/core/Module.php';
 require_once __DIR__ . '/core/ModuleRegistry.php';
 require_once __DIR__ . '/core/Sidebar.php';
 require_once __DIR__ . '/core/Rbac.php';
+require_once __DIR__ . '/core/EventBus.php';
+require_once __DIR__ . '/core/ModuleLink.php';
 
 use Core\Database;
 use Core\Auth;

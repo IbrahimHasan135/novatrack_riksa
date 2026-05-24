@@ -15,7 +15,7 @@
                 { type: 'bar', label: 'Pemasukan', data: rows.map(function (row) { return row.income; }), backgroundColor: 'rgba(39,174,96,.62)', borderRadius: 6 },
                 { type: 'bar', label: 'Pengeluaran', data: rows.map(function (row) { return row.expense; }), backgroundColor: 'rgba(235,87,87,.55)', borderRadius: 6 },
                 { type: 'line', label: 'Net', data: rows.map(function (row) { return row.net; }), borderColor: '#3A6EA5', backgroundColor: 'rgba(58,110,165,.12)', tension: .32 },
-                { type: 'line', label: 'Piutang', data: rows.map(function (row) { return row.debt; }), borderColor: '#F2994A', backgroundColor: 'rgba(242,153,74,.12)', tension: .32 }
+                { type: 'line', label: 'Utang', data: rows.map(function (row) { return row.debt; }), borderColor: '#F2994A', backgroundColor: 'rgba(242,153,74,.12)', tension: .32 }
             ]
         },
         options: {

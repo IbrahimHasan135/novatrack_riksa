@@ -37,10 +37,10 @@ class AccountingReport
         }
 
         $metrics = [
-            ['label' => 'Pemasukan', 'value' => $this->sum('accounting_incomes', 'amount', 'received_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
-            ['label' => 'Pengeluaran', 'value' => $this->sum('accounting_expenses', 'amount', 'expense_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
+            ['label' => 'Pemasukan', 'value' => $this->sum('accounting_incomes', 'amount', 'record_state = "published" AND received_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
+            ['label' => 'Pengeluaran', 'value' => $this->sum('accounting_expenses', 'amount', 'record_state = "published" AND expense_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
             ['label' => 'Net', 'value' => 0, 'type' => 'money'],
-            ['label' => 'Piutang', 'value' => $this->sum('accounting_receivables', 'GREATEST(amount - paid_amount, 0)', 'issued_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
+            ['label' => 'Utang', 'value' => $this->sum('accounting_receivables', 'GREATEST(amount - paid_amount, 0)', 'record_state = "published" AND issued_date BETWEEN :start AND :end', compact('start', 'end')), 'type' => 'money'],
         ];
         $metrics[2]['value'] = $metrics[0]['value'] - $metrics[1]['value'];
 
@@ -88,7 +88,7 @@ class AccountingReport
             'SELECT COALESCE(s.name, "Uncategorized") AS source_name, SUM(i.amount) AS total, COUNT(i.id) AS transactions
              FROM accounting_incomes i
              LEFT JOIN accounting_income_sources s ON s.id = i.source_id
-             WHERE i.received_date BETWEEN :start AND :end
+             WHERE i.record_state = "published" AND i.received_date BETWEEN :start AND :end
              GROUP BY COALESCE(s.name, "Uncategorized")
              ORDER BY total DESC'
         );
@@ -110,7 +110,7 @@ class AccountingReport
             'SELECT COALESCE(c.name, "Uncategorized") AS category_name, SUM(e.amount) AS total, COUNT(e.id) AS transactions
              FROM accounting_expenses e
              LEFT JOIN accounting_expense_categories c ON c.id = e.category_id
-             WHERE e.expense_date BETWEEN :start AND :end
+             WHERE e.record_state = "published" AND e.expense_date BETWEEN :start AND :end
              GROUP BY COALESCE(c.name, "Uncategorized")
              ORDER BY total DESC'
         );
@@ -132,7 +132,7 @@ class AccountingReport
             'SELECT i.received_date AS date, i.title, COALESCE(s.name, "Uncategorized") AS source, i.client_name AS client, i.amount, i.reference_no AS ref
              FROM accounting_incomes i
              LEFT JOIN accounting_income_sources s ON s.id = i.source_id
-             WHERE i.received_date BETWEEN :start AND :end
+             WHERE i.record_state = "published" AND i.received_date BETWEEN :start AND :end
              ORDER BY i.received_date ASC, i.id ASC'
         );
         $stmt->execute(compact('start', 'end'));
@@ -156,7 +156,7 @@ class AccountingReport
             'SELECT e.expense_date AS date, e.title, COALESCE(c.name, "Uncategorized") AS source, e.vendor_name AS client, e.amount, e.reference_no AS ref
              FROM accounting_expenses e
              LEFT JOIN accounting_expense_categories c ON c.id = e.category_id
-             WHERE e.expense_date BETWEEN :start AND :end
+             WHERE e.record_state = "published" AND e.expense_date BETWEEN :start AND :end
              ORDER BY e.expense_date ASC, e.id ASC'
         );
         $stmt->execute(compact('start', 'end'));
@@ -179,16 +179,16 @@ class AccountingReport
         $stmt = $this->db->prepare(
             'SELECT issued_date AS date, title, debtor_name, amount, paid_amount, GREATEST(amount - paid_amount, 0) AS outstanding, due_date, status, reference_no
              FROM accounting_receivables
-             WHERE issued_date BETWEEN :start AND :end
+             WHERE record_state = "published" AND issued_date BETWEEN :start AND :end
              ORDER BY issued_date ASC, id ASC'
         );
         $stmt->execute(compact('start', 'end'));
         return [
-            'title' => 'Detail Piutang',
+            'title' => 'Detail Utang',
             'columns' => [
                 ['key' => 'date', 'label' => 'Tanggal', 'type' => 'date'],
                 ['key' => 'title', 'label' => 'Judul'],
-                ['key' => 'debtor_name', 'label' => 'Debtor'],
+                ['key' => 'debtor_name', 'label' => 'Creditor'],
                 ['key' => 'amount', 'label' => 'Nominal', 'type' => 'money'],
                 ['key' => 'paid_amount', 'label' => 'Terbayar', 'type' => 'money'],
                 ['key' => 'outstanding', 'label' => 'Outstanding', 'type' => 'money'],
@@ -223,7 +223,7 @@ class AccountingReport
                 ['key' => 'income', 'label' => 'Pemasukan', 'type' => 'money'],
                 ['key' => 'expense', 'label' => 'Pengeluaran', 'type' => 'money'],
                 ['key' => 'net', 'label' => 'Net', 'type' => 'money'],
-                ['key' => 'debt', 'label' => 'Piutang', 'type' => 'money'],
+                ['key' => 'debt', 'label' => 'Utang', 'type' => 'money'],
             ],
             'rows' => $rows,
         ];
@@ -266,7 +266,7 @@ class AccountingReport
 
     private function fillChart(array &$rows, string $table, string $dateColumn, string $amountColumn, string $target, string $start, string $end): void
     {
-        $stmt = $this->db->prepare("SELECT `$dateColumn` AS period, SUM($amountColumn) AS total FROM `$table` WHERE `$dateColumn` BETWEEN :start AND :end GROUP BY `$dateColumn`");
+        $stmt = $this->db->prepare("SELECT `$dateColumn` AS period, SUM($amountColumn) AS total FROM `$table` WHERE record_state = 'published' AND `$dateColumn` BETWEEN :start AND :end GROUP BY `$dateColumn`");
         $stmt->execute(compact('start', 'end'));
         foreach ($stmt->fetchAll() as $row) {
             $rows[$row['period']][$target] = (float)$row['total'];
@@ -275,7 +275,7 @@ class AccountingReport
 
     private function fillYearChart(array &$rows, string $table, string $dateColumn, string $amountColumn, string $target, int $year): void
     {
-        $stmt = $this->db->prepare("SELECT DATE_FORMAT(`$dateColumn`, '%Y-%m') AS period, SUM($amountColumn) AS total FROM `$table` WHERE YEAR(`$dateColumn`) = :year GROUP BY DATE_FORMAT(`$dateColumn`, '%Y-%m')");
+        $stmt = $this->db->prepare("SELECT DATE_FORMAT(`$dateColumn`, '%Y-%m') AS period, SUM($amountColumn) AS total FROM `$table` WHERE record_state = 'published' AND YEAR(`$dateColumn`) = :year GROUP BY DATE_FORMAT(`$dateColumn`, '%Y-%m')");
         $stmt->execute(['year' => $year]);
         foreach ($stmt->fetchAll() as $row) {
             $rows[$row['period']][$target] = (float)$row['total'];

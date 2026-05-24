@@ -13,8 +13,16 @@
         <div style="font-size:24px;font-weight:800;color:#1C2B3A;margin-top:8px;"><?= nt_money($summary['net_month']); ?></div>
     </a>
     <a href="<?= app_url('accounting/receivables'); ?>" style="text-decoration:none;background:#FFF8E1;border:1px solid #F5E2A8;border-radius:14px;padding:16px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#B9770E;">Piutang Outstanding</div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#B9770E;">Utang Outstanding</div>
         <div style="font-size:24px;font-weight:800;color:#1C2B3A;margin-top:8px;"><?= nt_money($summary['receivable_open']); ?></div>
+    </a>
+    <a href="<?= app_url('accounting/receivables'); ?>" style="text-decoration:none;background:#F4F8FC;border:1px solid #DDE8F4;border-radius:14px;padding:16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#416C92;">Draft Accounting</div>
+        <div style="font-size:24px;font-weight:800;color:#1C2B3A;margin-top:8px;"><?= (int)$summary['draft_count']; ?></div>
+    </a>
+    <a href="<?= app_url('accounting/receivables'); ?>" style="text-decoration:none;background:#F4F8FC;border:1px solid #DDE8F4;border-radius:14px;padding:16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#416C92;">Verification</div>
+        <div style="font-size:24px;font-weight:800;color:#1C2B3A;margin-top:8px;"><?= (int)$summary['verification_count']; ?></div>
     </a>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">

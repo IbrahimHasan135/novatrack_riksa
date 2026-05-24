@@ -21,7 +21,7 @@ require_once __DIR__ . '/_helpers.php';
                     <div class="acct-field"><label>Metode</label><input name="payment_method" value="<?= htmlspecialchars($income['payment_method']); ?>"></div>
                     <div class="acct-field full"><label>Reference No</label><input name="reference_no" value="<?= htmlspecialchars($income['reference_no']); ?>"></div>
                     <div class="acct-field full"><label>Notes</label><textarea name="notes"><?= htmlspecialchars($income['notes']); ?></textarea></div>
-                    <div class="acct-field full"><button class="acct-btn" type="submit"><i class="bi bi-save"></i> Update Pemasukan</button></div>
+                    <div class="acct-field full acct-submit-row"><button class="acct-btn secondary" type="submit" name="record_state" value="draft"><i class="bi bi-file-earmark"></i> Simpan Draft</button><button class="acct-btn secondary" type="submit" name="record_state" value="verification"><i class="bi bi-hourglass-split"></i> Verification</button><button class="acct-btn" type="submit" name="record_state" value="published"><i class="bi bi-save"></i> Publish Pemasukan</button></div>
                 </form>
             </article>
         </div>

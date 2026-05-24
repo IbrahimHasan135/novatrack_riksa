@@ -142,7 +142,7 @@ class AccountingController
     {
         $receivable = $this->getReceivable($id);
         if (!$receivable) {
-            $this->notFound('Piutang tidak ditemukan');
+            $this->notFound('Utang tidak ditemukan');
             return;
         }
         Module::renderView('Accounting/views/receivable_edit', compact('receivable'));
@@ -153,9 +153,9 @@ class AccountingController
         $sourceId = $this->resolveIncomeSource();
         $stmt = $this->db->prepare(
             'INSERT INTO accounting_incomes
-                (source_id, client_name, title, amount, received_date, payment_method, reference_no, notes, created_at)
+                (source_id, client_name, title, amount, received_date, payment_method, reference_no, record_state, notes, created_at)
              VALUES
-                (:source_id, :client_name, :title, :amount, :received_date, :payment_method, :reference_no, :notes, NOW())'
+                (:source_id, :client_name, :title, :amount, :received_date, :payment_method, :reference_no, :record_state, :notes, NOW())'
         );
         $stmt->execute([
             'source_id' => $sourceId ?: null,
@@ -165,6 +165,7 @@ class AccountingController
             'received_date' => $_POST['received_date'] ?: date('Y-m-d'),
             'payment_method' => trim($_POST['payment_method'] ?? ''),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
+            'record_state' => $this->recordState(),
             'notes' => trim($_POST['notes'] ?? ''),
         ]);
         header('Location: ' . app_url('accounting/income?created=1'));
@@ -182,6 +183,7 @@ class AccountingController
                  received_date = :received_date,
                  payment_method = :payment_method,
                  reference_no = :reference_no,
+                 record_state = :record_state,
                  notes = :notes,
                  updated_at = NOW()
              WHERE id = :id'
@@ -202,9 +204,9 @@ class AccountingController
         $categoryId = $this->resolveExpenseCategory();
         $stmt = $this->db->prepare(
             'INSERT INTO accounting_expenses
-                (category_id, vendor_name, title, amount, expense_date, payment_method, reference_no, notes, created_at)
+                (category_id, vendor_name, title, amount, expense_date, payment_method, reference_no, record_state, notes, created_at)
              VALUES
-                (:category_id, :vendor_name, :title, :amount, :expense_date, :payment_method, :reference_no, :notes, NOW())'
+                (:category_id, :vendor_name, :title, :amount, :expense_date, :payment_method, :reference_no, :record_state, :notes, NOW())'
         );
         $stmt->execute([
             'category_id' => $categoryId ?: null,
@@ -214,6 +216,7 @@ class AccountingController
             'expense_date' => $_POST['expense_date'] ?: date('Y-m-d'),
             'payment_method' => trim($_POST['payment_method'] ?? ''),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
+            'record_state' => $this->recordState(),
             'notes' => trim($_POST['notes'] ?? ''),
         ]);
         header('Location: ' . app_url('accounting/expenses?created=1'));
@@ -231,6 +234,7 @@ class AccountingController
                  expense_date = :expense_date,
                  payment_method = :payment_method,
                  reference_no = :reference_no,
+                 record_state = :record_state,
                  notes = :notes,
                  updated_at = NOW()
              WHERE id = :id'
@@ -262,9 +266,9 @@ class AccountingController
 
         $stmt = $this->db->prepare(
             'INSERT INTO accounting_receivables
-                (debtor_name, title, amount, paid_amount, issued_date, due_date, status, reference_no, notes, created_at)
+                (debtor_name, title, amount, paid_amount, issued_date, due_date, status, record_state, reference_no, notes, created_at)
              VALUES
-                (:debtor_name, :title, :amount, :paid_amount, :issued_date, :due_date, :status, :reference_no, :notes, NOW())'
+                (:debtor_name, :title, :amount, :paid_amount, :issued_date, :due_date, :status, :record_state, :reference_no, :notes, NOW())'
         );
         $stmt->execute([
             'debtor_name' => trim($_POST['debtor_name'] ?? ''),
@@ -274,6 +278,7 @@ class AccountingController
             'issued_date' => $_POST['issued_date'] ?: date('Y-m-d'),
             'due_date' => ($_POST['due_date'] ?? '') !== '' ? $_POST['due_date'] : null,
             'status' => in_array($status, ['open', 'partial', 'paid', 'overdue', 'written_off'], true) ? $status : 'open',
+            'record_state' => $this->recordState(),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
             'notes' => trim($_POST['notes'] ?? ''),
         ]);
@@ -292,6 +297,7 @@ class AccountingController
                  issued_date = :issued_date,
                  due_date = :due_date,
                  status = :status,
+                 record_state = :record_state,
                  reference_no = :reference_no,
                  notes = :notes,
                  updated_at = NOW()
@@ -331,10 +337,10 @@ class AccountingController
     {
         $monthStart = date('Y-m-01');
         $yearStart = date('Y-01-01');
-        $incomeMonth = $this->sum('accounting_incomes', 'amount', 'received_date >= :start', ['start' => $monthStart]);
-        $expenseMonth = $this->sum('accounting_expenses', 'amount', 'expense_date >= :start', ['start' => $monthStart]);
-        $incomeYear = $this->sum('accounting_incomes', 'amount', 'received_date >= :start', ['start' => $yearStart]);
-        $expenseYear = $this->sum('accounting_expenses', 'amount', 'expense_date >= :start', ['start' => $yearStart]);
+        $incomeMonth = $this->sum('accounting_incomes', 'amount', 'received_date >= :start AND record_state = "published"', ['start' => $monthStart]);
+        $expenseMonth = $this->sum('accounting_expenses', 'amount', 'expense_date >= :start AND record_state = "published"', ['start' => $monthStart]);
+        $incomeYear = $this->sum('accounting_incomes', 'amount', 'received_date >= :start AND record_state = "published"', ['start' => $yearStart]);
+        $expenseYear = $this->sum('accounting_expenses', 'amount', 'expense_date >= :start AND record_state = "published"', ['start' => $yearStart]);
 
         return [
             'income_month' => $incomeMonth,
@@ -343,7 +349,9 @@ class AccountingController
             'income_year' => $incomeYear,
             'expense_year' => $expenseYear,
             'net_year' => $incomeYear - $expenseYear,
-            'receivable_open' => $this->sum('accounting_receivables', 'GREATEST(amount - paid_amount, 0)', 'status != "paid"', []),
+            'receivable_open' => $this->sum('accounting_receivables', 'GREATEST(amount - paid_amount, 0)', 'status != "paid" AND record_state = "published"', []),
+            'draft_count' => $this->draftCount(),
+            'verification_count' => $this->recordStateCount('verification'),
         ];
     }
 
@@ -356,10 +364,10 @@ class AccountingController
                     SUM(income) - SUM(expense) AS net
              FROM (
                 SELECT DATE_FORMAT(received_date, "%Y-%m") AS period, SUM(amount) AS income, 0 AS expense
-                FROM accounting_incomes GROUP BY DATE_FORMAT(received_date, "%Y-%m")
+                FROM accounting_incomes WHERE record_state = "published" GROUP BY DATE_FORMAT(received_date, "%Y-%m")
                 UNION ALL
                 SELECT DATE_FORMAT(expense_date, "%Y-%m") AS period, 0 AS income, SUM(amount) AS expense
-                FROM accounting_expenses GROUP BY DATE_FORMAT(expense_date, "%Y-%m")
+                FROM accounting_expenses WHERE record_state = "published" GROUP BY DATE_FORMAT(expense_date, "%Y-%m")
              ) x
              GROUP BY period
              ORDER BY period DESC
@@ -379,10 +387,10 @@ class AccountingController
                     SUM(income) - SUM(expense) AS net
              FROM (
                 SELECT YEAR(received_date) AS period, SUM(amount) AS income, 0 AS expense
-                FROM accounting_incomes GROUP BY YEAR(received_date)
+                FROM accounting_incomes WHERE record_state = "published" GROUP BY YEAR(received_date)
                 UNION ALL
                 SELECT YEAR(expense_date) AS period, 0 AS income, SUM(amount) AS expense
-                FROM accounting_expenses GROUP BY YEAR(expense_date)
+                FROM accounting_expenses WHERE record_state = "published" GROUP BY YEAR(expense_date)
              ) x
              GROUP BY period
              ORDER BY period DESC
@@ -392,10 +400,10 @@ class AccountingController
 
     public function topIncomeSources(int $limit, ?string $from = null, ?string $to = null): array
     {
-        $where = '';
+        $where = 'WHERE i.record_state = "published"';
         $params = [];
         if ($from && $to) {
-            $where = 'WHERE i.received_date BETWEEN :from AND :to';
+            $where .= ' AND i.received_date BETWEEN :from AND :to';
             $params = ['from' => $from, 'to' => $to];
         }
         $stmt = $this->db->prepare(
@@ -419,10 +427,10 @@ class AccountingController
 
     private function expenseByCategory(int $limit, ?string $from = null, ?string $to = null): array
     {
-        $where = '';
+        $where = 'WHERE e.record_state = "published"';
         $params = [];
         if ($from && $to) {
-            $where = 'WHERE e.expense_date BETWEEN :from AND :to';
+            $where .= ' AND e.expense_date BETWEEN :from AND :to';
             $params = ['from' => $from, 'to' => $to];
         }
         $stmt = $this->db->prepare(
@@ -452,9 +460,13 @@ class AccountingController
                     SUM(paid_amount) AS paid_amount,
                     SUM(GREATEST(amount - paid_amount, 0)) AS outstanding,
                     SUM(status = "overdue") AS overdue_count
-             FROM accounting_receivables'
+             FROM accounting_receivables
+             WHERE record_state = "published"'
         )->fetch();
-        return $row ?: ['total_items' => 0, 'total_amount' => 0, 'paid_amount' => 0, 'outstanding' => 0, 'overdue_count' => 0];
+        $row = $row ?: ['total_items' => 0, 'total_amount' => 0, 'paid_amount' => 0, 'outstanding' => 0, 'overdue_count' => 0];
+        $row['draft_count'] = $this->draftCount();
+        $row['verification_count'] = $this->recordStateCount('verification');
+        return $row;
     }
 
     private function recentIncomes(int $limit): array
@@ -529,6 +541,7 @@ class AccountingController
             'received_date' => $_POST['received_date'] ?: date('Y-m-d'),
             'payment_method' => trim($_POST['payment_method'] ?? ''),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
+            'record_state' => $this->recordState(),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
     }
@@ -543,6 +556,7 @@ class AccountingController
             'expense_date' => $_POST['expense_date'] ?: date('Y-m-d'),
             'payment_method' => trim($_POST['payment_method'] ?? ''),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
+            'record_state' => $this->recordState(),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
     }
@@ -569,9 +583,16 @@ class AccountingController
             'issued_date' => $_POST['issued_date'] ?: date('Y-m-d'),
             'due_date' => ($_POST['due_date'] ?? '') !== '' ? $_POST['due_date'] : null,
             'status' => in_array($status, ['open', 'partial', 'paid', 'overdue', 'written_off'], true) ? $status : 'open',
+            'record_state' => $this->recordState(),
             'reference_no' => trim($_POST['reference_no'] ?? ''),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
+    }
+
+    private function recordState(): string
+    {
+        $state = $_POST['record_state'] ?? 'published';
+        return in_array($state, ['draft', 'verification', 'published'], true) ? $state : 'published';
     }
 
     private function monthChart(string $month): array
@@ -585,19 +606,19 @@ class AccountingController
             $rows[$date] = ['period' => $date, 'income' => 0, 'expense' => 0, 'net' => 0, 'debt' => 0];
         }
 
-        $income = $this->db->prepare('SELECT received_date AS period, SUM(amount) AS total FROM accounting_incomes WHERE received_date BETWEEN :start AND :end GROUP BY received_date');
+        $income = $this->db->prepare('SELECT received_date AS period, SUM(amount) AS total FROM accounting_incomes WHERE record_state = "published" AND received_date BETWEEN :start AND :end GROUP BY received_date');
         $income->execute(['start' => $start, 'end' => $end]);
         foreach ($income->fetchAll() as $row) {
             $rows[$row['period']]['income'] = (float)$row['total'];
         }
 
-        $expense = $this->db->prepare('SELECT expense_date AS period, SUM(amount) AS total FROM accounting_expenses WHERE expense_date BETWEEN :start AND :end GROUP BY expense_date');
+        $expense = $this->db->prepare('SELECT expense_date AS period, SUM(amount) AS total FROM accounting_expenses WHERE record_state = "published" AND expense_date BETWEEN :start AND :end GROUP BY expense_date');
         $expense->execute(['start' => $start, 'end' => $end]);
         foreach ($expense->fetchAll() as $row) {
             $rows[$row['period']]['expense'] = (float)$row['total'];
         }
 
-        $debt = $this->db->prepare('SELECT issued_date AS period, SUM(GREATEST(amount - paid_amount, 0)) AS total FROM accounting_receivables WHERE issued_date BETWEEN :start AND :end GROUP BY issued_date');
+        $debt = $this->db->prepare('SELECT issued_date AS period, SUM(GREATEST(amount - paid_amount, 0)) AS total FROM accounting_receivables WHERE record_state = "published" AND issued_date BETWEEN :start AND :end GROUP BY issued_date');
         $debt->execute(['start' => $start, 'end' => $end]);
         foreach ($debt->fetchAll() as $row) {
             $rows[$row['period']]['debt'] = (float)$row['total'];
@@ -617,19 +638,19 @@ class AccountingController
             $rows[$period] = ['period' => $period, 'income' => 0, 'expense' => 0, 'net' => 0, 'debt' => 0];
         }
 
-        $income = $this->db->prepare('SELECT DATE_FORMAT(received_date, "%Y-%m") AS period, SUM(amount) AS total FROM accounting_incomes WHERE YEAR(received_date) = :year GROUP BY DATE_FORMAT(received_date, "%Y-%m")');
+        $income = $this->db->prepare('SELECT DATE_FORMAT(received_date, "%Y-%m") AS period, SUM(amount) AS total FROM accounting_incomes WHERE record_state = "published" AND YEAR(received_date) = :year GROUP BY DATE_FORMAT(received_date, "%Y-%m")');
         $income->execute(['year' => $year]);
         foreach ($income->fetchAll() as $row) {
             $rows[$row['period']]['income'] = (float)$row['total'];
         }
 
-        $expense = $this->db->prepare('SELECT DATE_FORMAT(expense_date, "%Y-%m") AS period, SUM(amount) AS total FROM accounting_expenses WHERE YEAR(expense_date) = :year GROUP BY DATE_FORMAT(expense_date, "%Y-%m")');
+        $expense = $this->db->prepare('SELECT DATE_FORMAT(expense_date, "%Y-%m") AS period, SUM(amount) AS total FROM accounting_expenses WHERE record_state = "published" AND YEAR(expense_date) = :year GROUP BY DATE_FORMAT(expense_date, "%Y-%m")');
         $expense->execute(['year' => $year]);
         foreach ($expense->fetchAll() as $row) {
             $rows[$row['period']]['expense'] = (float)$row['total'];
         }
 
-        $debt = $this->db->prepare('SELECT DATE_FORMAT(issued_date, "%Y-%m") AS period, SUM(GREATEST(amount - paid_amount, 0)) AS total FROM accounting_receivables WHERE YEAR(issued_date) = :year GROUP BY DATE_FORMAT(issued_date, "%Y-%m")');
+        $debt = $this->db->prepare('SELECT DATE_FORMAT(issued_date, "%Y-%m") AS period, SUM(GREATEST(amount - paid_amount, 0)) AS total FROM accounting_receivables WHERE record_state = "published" AND YEAR(issued_date) = :year GROUP BY DATE_FORMAT(issued_date, "%Y-%m")');
         $debt->execute(['year' => $year]);
         foreach ($debt->fetchAll() as $row) {
             $rows[$row['period']]['debt'] = (float)$row['total'];
@@ -698,6 +719,22 @@ class AccountingController
         return (float)$stmt->fetchColumn();
     }
 
+    private function draftCount(): int
+    {
+        return $this->recordStateCount('draft');
+    }
+
+    private function recordStateCount(string $state): int
+    {
+        $total = 0;
+        foreach (['accounting_incomes', 'accounting_expenses', 'accounting_receivables'] as $table) {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM `$table` WHERE record_state = :state");
+            $stmt->execute(['state' => $state]);
+            $total += (int)$stmt->fetchColumn();
+        }
+        return $total;
+    }
+
     private function money(mixed $value): float
     {
         return max(0, (float)str_replace([',', ' '], ['', ''], (string)$value));
@@ -708,6 +745,18 @@ class AccountingController
         $meta = new AccountingModuleMeta();
         foreach ($meta->tables() as $schema) {
             $this->db->exec($schema);
+        }
+        $this->addColumnIfMissing('accounting_incomes', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER reference_no');
+        $this->addColumnIfMissing('accounting_expenses', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER reference_no');
+        $this->addColumnIfMissing('accounting_receivables', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER status');
+    }
+
+    private function addColumnIfMissing(string $table, string $column, string $definition): void
+    {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column');
+        $stmt->execute(['table' => $table, 'column' => $column]);
+        if ((int)$stmt->fetchColumn() === 0) {
+            $this->db->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
         }
     }
 

@@ -116,7 +116,7 @@ class HtmlReportRenderer
             $svg .= '<polyline fill="none" stroke="' . $color . '" stroke-width="3" points="' . implode(' ', $points) . '"/>';
         }
         $legendX = $pad;
-        foreach (['income' => 'Pemasukan', 'expense' => 'Pengeluaran', 'net' => 'Net', 'debt' => 'Piutang'] as $key => $label) {
+        foreach (['income' => 'Pemasukan', 'expense' => 'Pengeluaran', 'net' => 'Net', 'debt' => 'Utang'] as $key => $label) {
             $svg .= '<rect x="' . $legendX . '" y="12" width="10" height="10" rx="2" fill="' . $keys[$key] . '"/>';
             $svg .= '<text x="' . ($legendX + 15) . '" y="21" font-size="11" fill="#416C92" font-weight="700">' . $this->e($label) . '</text>';
             $legendX += 118;
