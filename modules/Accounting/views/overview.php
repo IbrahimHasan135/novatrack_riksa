@@ -75,7 +75,7 @@ $user = \Core\Auth::getInstance()->user();
     </section>
 </main>
 <footer class="app-footer"><span>&copy; <?= date('Y'); ?> NovaTrack Riksa</span><span class="app-footer-sep">|</span><span>Accounting</span></footer>
-<?php require __DIR__ . '/styles.php'; ?>
+
 <script>
 (function () {
     var rows = <?= json_encode($chartRows, JSON_NUMERIC_CHECK); ?>;

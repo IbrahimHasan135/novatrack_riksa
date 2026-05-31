@@ -33,7 +33,7 @@ require_once __DIR__ . '/_helpers.php';
                 <div class="acct-list">
                     <?php $max = max(1, ...array_map(fn($r) => (float)$r['total'], $topSources ?: [['total' => 1]])); ?>
                     <?php foreach ($topSources as $source): ?>
-                        <div class="acct-list-row"><div style="flex:1;"><b><?= htmlspecialchars($source['source_name']); ?></b><br><span><?= (int)$source['transactions']; ?> transaksi</span><div class="acct-progress"><span style="width:<?= min(100, ((float)$source['total'] / $max) * 100); ?>%"></span></div></div><strong><?= nt_money($source['total']); ?></strong></div>
+                        <div class="acct-list-row"><div class="nt-flex-1"><b><?= htmlspecialchars($source['source_name']); ?></b><br><span><?= (int)$source['transactions']; ?> transaksi</span><div class="acct-progress"><progress max="100" value="<?= min(100, ((float)$source['total'] / $max) * 100); ?>"></progress></div></div><strong><?= nt_money($source['total']); ?></strong></div>
                     <?php endforeach; ?>
                 </div>
             </article>
@@ -42,5 +42,5 @@ require_once __DIR__ . '/_helpers.php';
     </section>
 </main>
 <footer class="app-footer"><span>&copy; <?= date('Y'); ?> NovaTrack Riksa</span><span class="app-footer-sep">|</span><span>Accounting</span></footer>
-<?php require __DIR__ . '/styles.php'; ?>
+
 </body></html>

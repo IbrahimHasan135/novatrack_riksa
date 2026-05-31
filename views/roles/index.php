@@ -55,5 +55,5 @@ require __DIR__ . '/../layout/header.php';
     </section>
 </main>
 <footer class="app-footer"><span>&copy; <?= date('Y'); ?> NovaTrack Riksa</span></footer>
-<?php require __DIR__ . '/styles.php'; ?>
+
 </body></html>

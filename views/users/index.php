@@ -79,5 +79,5 @@ $rbac = new \Core\Rbac();
     });
 })();
 </script>
-<?php require __DIR__ . '/../roles/styles.php'; ?>
+
 </body></html>

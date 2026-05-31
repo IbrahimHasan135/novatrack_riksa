@@ -41,6 +41,5 @@ require __DIR__ . '/../layout/header.php';
     });
 })();
 </script>
-<?php require __DIR__ . '/../roles/styles.php'; ?>
-<style>.admin-muted { color:#416C92;font-size:13px;margin:4px 0 12px; }</style>
+
 </body></html>

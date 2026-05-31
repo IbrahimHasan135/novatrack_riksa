@@ -108,31 +108,31 @@ class CasesModuleMeta extends ModuleMeta
 
                     ob_start();
                     ?>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px;">
-                        <div class="c-mini" style="background:#E8F0FB;border-radius:14px;padding:16px;border:1px solid #DDE8F4;">
-                            <div style="font-weight:800;font-size:28px;color:#3A6EA5;"><?= $total; ?></div>
-                            <div style="font-size:12px;color:#4A5E75;font-weight:700;">Total Cases</div>
+                    <div class="nt-metric-grid">
+                        <div class="nt-metric-card">
+                            <div class="nt-metric-value"><?= $total; ?></div>
+                            <div class="nt-metric-label">Total Cases</div>
                         </div>
-                        <div class="c-mini" style="background:#E7F7F2;border-radius:14px;padding:16px;border:1px solid #DDE8F4;">
-                            <div style="font-weight:800;font-size:28px;color:#1BA784;"><?= count($rows); ?></div>
-                            <div style="font-size:12px;color:#4A5E75;font-weight:700;">Case Types</div>
+                        <div class="nt-metric-card success">
+                            <div class="nt-metric-value"><?= count($rows); ?></div>
+                            <div class="nt-metric-label">Case Types</div>
                         </div>
                     </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;">
+                    <div class="case-dash-folder-grid">
                         <?php foreach ($rows as $row): ?>
-                            <a href="<?= app_url('cases/type/' . (int)$row['id']); ?>" style="display:block;text-decoration:none;background:rgba(255,255,255,.86);border:1px solid rgba(58,110,165,.14);border-radius:16px;padding:16px;box-shadow:0 10px 28px rgba(30,72,126,.08);">
-                                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-                                    <div style="display:flex;align-items:center;gap:10px;color:#1C2B3A;font-weight:800;">
-                                        <i class="bi bi-folder-fill" style="color:#1BA784;font-size:24px;"></i>
+                            <a class="case-dash-folder" href="<?= app_url('cases/type/' . (int)$row['id']); ?>">
+                                <div class="case-dash-folder-head">
+                                    <div class="case-dash-folder-name">
+                                        <i class="bi bi-folder-fill"></i>
                                         <?= htmlspecialchars($row['name']); ?>
                                     </div>
-                                    <span style="font-size:12px;color:#416C92;font-weight:700;"><?= (int)$row['total']; ?> case</span>
+                                    <span class="case-dash-folder-count"><?= (int)$row['total']; ?> case</span>
                                 </div>
-                                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;font-size:11px;font-weight:700;">
-                                    <span style="background:#E8F0FB;color:#3A6EA5;border-radius:20px;padding:3px 8px;">Verify <?= (int)$row['verification_count']; ?></span>
-                                    <span style="background:#FFF8E1;color:#E09F3E;border-radius:20px;padding:3px 8px;">Progress <?= (int)$row['progress_count']; ?></span>
-                                    <span style="background:#E8F7EE;color:#27AE60;border-radius:20px;padding:3px 8px;">Done <?= (int)$row['done_count']; ?></span>
-                                    <span style="background:#F0F2F5;color:#5A7089;border-radius:20px;padding:3px 8px;">Close <?= (int)$row['closed_count']; ?></span>
+                                <div class="case-dash-badges">
+                                    <span class="badge-status verification">Verify <?= (int)$row['verification_count']; ?></span>
+                                    <span class="badge-status progress">Progress <?= (int)$row['progress_count']; ?></span>
+                                    <span class="badge-status done">Done <?= (int)$row['done_count']; ?></span>
+                                    <span class="badge-status closed">Close <?= (int)$row['closed_count']; ?></span>
                                 </div>
                             </a>
                         <?php endforeach; ?>

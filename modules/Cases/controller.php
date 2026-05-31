@@ -401,9 +401,9 @@ class CasesController
     private function notFound(string $message): void
     {
         http_response_code(404);
-        echo '<div style="padding:40px;text-align:center;font-family:Inter,sans-serif;">';
-        echo '<h2 style="color:#EB5757;">404 &mdash; ' . htmlspecialchars($message) . '</h2>';
-        echo '<a href="' . htmlspecialchars(app_url('cases')) . '" style="color:#3A6EA5;font-weight:600;">&larr; Kembali ke Cases</a>';
+        echo '<div class="nt-error-state">';
+        echo '<h2>404 &mdash; ' . htmlspecialchars($message) . '</h2>';
+        echo '<a href="' . htmlspecialchars(app_url('cases')) . '">&larr; Kembali ke Cases</a>';
         echo '</div>';
     }
 }

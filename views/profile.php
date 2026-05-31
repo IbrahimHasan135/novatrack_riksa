@@ -58,11 +58,5 @@ $activePassword = ($_GET['tab'] ?? '') === 'password';
     });
 })();
 </script>
-<?php require __DIR__ . '/roles/styles.php'; ?>
-<style>
-.profile-lines { display:grid;gap:10px;margin-top:12px; }
-.profile-lines div { background:#F7FAFD;border:1px solid #DDE8F4;border-radius:12px;padding:12px 13px; }
-.profile-lines span { display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#68839E;margin-bottom:3px; }
-.profile-lines strong { color:#1C2B3A;font-size:14px; }
-</style>
+
 </body></html>

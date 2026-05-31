@@ -1,5 +1,5 @@
 <?php require_once __DIR__ . '/_helpers.php'; ?>
-<div style="height:310px;position:relative;">
+<div class="nt-chart-compact">
     <canvas id="acctDashMonthChart"></canvas>
 </div>
 <script>

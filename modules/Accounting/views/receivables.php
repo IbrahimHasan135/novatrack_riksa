@@ -60,5 +60,5 @@ require_once __DIR__ . '/_helpers.php';
     </section>
 </main>
 <footer class="app-footer"><span>&copy; <?= date('Y'); ?> NovaTrack Riksa</span><span class="app-footer-sep">|</span><span>Accounting</span></footer>
-<?php require __DIR__ . '/styles.php'; ?>
+
 </body></html>
