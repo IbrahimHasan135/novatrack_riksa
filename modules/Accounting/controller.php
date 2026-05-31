@@ -12,7 +12,6 @@ class AccountingController
     {
         $this->db = Database::connection();
         $this->ensureSchema();
-        $this->seedDefaults();
     }
 
     public function overview(): void
@@ -757,18 +756,6 @@ class AccountingController
         $stmt->execute(['table' => $table, 'column' => $column]);
         if ((int)$stmt->fetchColumn() === 0) {
             $this->db->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
-        }
-    }
-
-    private function seedDefaults(): void
-    {
-        foreach (['Legal Retainer', 'Corporate Litigation', 'Contract Review', 'Compliance Advisory', 'Notary & Documentation'] as $name) {
-            $stmt = $this->db->prepare('INSERT IGNORE INTO accounting_income_sources (name, description) VALUES (:name, "")');
-            $stmt->execute(['name' => $name]);
-        }
-        foreach (['Operational', 'Professional Fee', 'Court & Filing', 'Marketing', 'Office Supplies'] as $name) {
-            $stmt = $this->db->prepare('INSERT IGNORE INTO accounting_expense_categories (name, description) VALUES (:name, "")');
-            $stmt->execute(['name' => $name]);
         }
     }
 

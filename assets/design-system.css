@@ -1,0 +1,79 @@
+/* NovaTrack Design System Entry Point
+   Edit config/design.php for theme tokens. This file maps tokens into
+   shared layout primitives used by core pages and modules. */
+
+:root {
+    --nt-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --nt-primary: #3A6EA5;
+    --nt-primary-l: #DDEAF5;
+    --nt-primary-h: #2563A8;
+    --nt-secondary: #1E487E;
+    --nt-accent: #1BA784;
+    --nt-accent-soft: #E7F7F2;
+    --nt-success: #27AE60;
+    --nt-warning: #F2994A;
+    --nt-danger: #EB5757;
+    --nt-body: #EAF1FB;
+    --nt-card: #FFFFFF;
+    --nt-text: #1C2B3A;
+    --nt-muted: #7A8FA8;
+    --nt-line: #DDE8F4;
+    --nt-radius: 14px;
+    --nt-card-radius: 18px;
+    --nt-grid-size: 34px;
+    --nt-pattern-opacity: .055;
+    --nt-page-bg: linear-gradient(135deg, #F7FAFD 0%, #EAF1FB 42%, #EEF7F4 100%);
+    --nt-sidebar-bg: linear-gradient(180deg, #102947 0%, #173E6D 48%, #0F5B67 100%);
+    --nt-brand-bg: linear-gradient(135deg, #3A6EA5, #1BA784);
+    --sb-w: 286px;
+    --sb-w-collapsed: 68px;
+}
+
+body.app-page,
+.app-body {
+    font-family: var(--nt-font);
+}
+
+.nt-shell,
+:is(.acct-shell, .sales-shell, .case-shell, .admin-shell) {
+    padding: 24px 28px 36px;
+}
+
+.nt-hero,
+:is(.acct-hero, .sales-hero, .case-hero, .admin-hero) {
+    border-radius: var(--nt-card-radius);
+    border: 1px solid rgba(58,110,165,.14);
+    background:
+        linear-gradient(135deg, rgba(255,255,255,.96), rgba(231,247,242,.82));
+    box-shadow: 0 18px 46px rgba(30,72,126,.10);
+    position: relative;
+    overflow: hidden;
+}
+
+.nt-hero::before,
+:is(.acct-hero, .sales-hero, .case-hero, .admin-hero)::before {
+    background: linear-gradient(90deg, var(--nt-primary), var(--nt-accent), var(--nt-warning));
+}
+
+.nt-card,
+:is(.acct-card, .sales-card, .admin-card, .table-card) {
+    background: rgba(255,255,255,.92);
+    border: 1px solid rgba(58,110,165,.14);
+    border-radius: var(--nt-card-radius);
+    box-shadow: 0 16px 42px rgba(30,72,126,.10);
+}
+
+.nt-btn,
+:is(.acct-btn, .sales-btn, .case-primary-btn, .admin-card button) {
+    border-radius: 12px;
+}
+
+.nt-btn-primary,
+:is(.acct-btn:not(.secondary), .sales-btn:not(.secondary), .case-primary-btn) {
+    background: var(--nt-brand-bg);
+}
+
+.nt-table,
+:is(.acct-table, .sales-table, .case-table, .admin-table) {
+    border-collapse: collapse;
+}

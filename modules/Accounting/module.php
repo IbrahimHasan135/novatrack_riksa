@@ -133,12 +133,12 @@ class AccountingModuleMeta extends ModuleMeta
     {
         try {
             $db = Database::connection();
-            $this->seedDefaults($db);
+            $this->ensureSchema($db);
         } catch (Throwable $e) {
         }
     }
 
-    private function seedDefaults(PDO $db): void
+    private function ensureSchema(PDO $db): void
     {
         foreach ($this->tables() as $schema) {
             $db->exec($schema);
@@ -146,14 +146,6 @@ class AccountingModuleMeta extends ModuleMeta
         $this->addColumnIfMissing($db, 'accounting_incomes', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER reference_no');
         $this->addColumnIfMissing($db, 'accounting_expenses', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER reference_no');
         $this->addColumnIfMissing($db, 'accounting_receivables', 'record_state', 'VARCHAR(30) DEFAULT "published" AFTER status');
-        foreach (['Legal Retainer', 'Corporate Litigation', 'Contract Review', 'Compliance Advisory', 'Notary & Documentation'] as $name) {
-            $stmt = $db->prepare('INSERT IGNORE INTO accounting_income_sources (name, description) VALUES (:name, "")');
-            $stmt->execute(['name' => $name]);
-        }
-        foreach (['Operational', 'Professional Fee', 'Court & Filing', 'Marketing', 'Office Supplies'] as $name) {
-            $stmt = $db->prepare('INSERT IGNORE INTO accounting_expense_categories (name, description) VALUES (:name, "")');
-            $stmt->execute(['name' => $name]);
-        }
     }
 
     private function addColumnIfMissing(PDO $db, string $table, string $column, string $definition): void

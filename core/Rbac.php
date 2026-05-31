@@ -22,6 +22,7 @@ class Rbac
             name VARCHAR(120) NOT NULL,
             slug VARCHAR(140) NOT NULL UNIQUE,
             is_system TINYINT(1) DEFAULT 0,
+            is_admin TINYINT(1) DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
@@ -38,12 +39,12 @@ class Rbac
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
         $this->ensureUserRoleColumn();
+        $this->addColumnIfMissing('roles', 'is_admin', 'TINYINT(1) DEFAULT 0 AFTER is_system');
         $this->addColumnIfMissing('cases', 'assigned_user_ids', 'JSON NULL AFTER reporter_id');
 
-        $this->seedRole('Super Admin', 'super_admin', true);
-        $this->seedRole('Admin', 'admin', true);
-        $this->seedRole('Legal Consultant', 'legal_consultan', true);
-        $this->seedSuperAdminUser();
+        $this->ensureSystemRole('Super Admin', 'super_admin');
+        $this->ensureSystemRole('Admin', 'admin');
+        $this->ensureSuperAdminUser();
     }
 
     public function currentRoleSlug(): string
@@ -61,8 +62,11 @@ class Rbac
     public function isAdminLike(?array $user = null): bool
     {
         $user = $user ?: $this->auth->user();
-        $role = $user['role'] ?? '';
-        return $role === 'super_admin' || $role === 'admin' || str_starts_with($role, 'admin_');
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+        $role = $this->getRoleBySlug($user['role'] ?? '');
+        return $role && (int)($role['is_admin'] ?? 0) === 1;
     }
 
     public function canAccessModule(string $moduleSlug, ?array $user = null): bool
@@ -71,7 +75,7 @@ class Rbac
         if (!$user) {
             return false;
         }
-        if ($this->isSuperAdmin($user) || ($user['role'] ?? '') === 'admin') {
+        if ($this->isSuperAdmin($user)) {
             return true;
         }
 
@@ -104,10 +108,6 @@ class Rbac
         if ($this->isSuperAdmin($user)) {
             return true;
         }
-        if ($this->isAdminLike($user) && $targetSlug !== 'super_admin') {
-            return true;
-        }
-
         $role = $this->getRoleBySlug($user['role'] ?? '');
         $target = $this->getRoleBySlug($targetSlug);
         if (!$role || !$target) {
@@ -121,7 +121,16 @@ class Rbac
 
     public function canViewAllCases(?array $user = null): bool
     {
-        return $this->isAdminLike($user);
+        return $this->canViewAllForModule('cases', $user);
+    }
+
+    public function canViewAllForModule(string $moduleSlug, ?array $user = null): bool
+    {
+        $user = $user ?: $this->auth->user();
+        if (!$user) {
+            return false;
+        }
+        return $this->isSuperAdmin($user) || ($this->isAdminLike($user) && $this->canAccessModule($moduleSlug, $user));
     }
 
     public function canViewPersonalNote(array $case, ?array $user = null): bool
@@ -202,7 +211,7 @@ class Rbac
         return array_map('intval', array_column($stmt->fetchAll(), 'creatable_role_id'));
     }
 
-    public function saveRole(string $name, array $modules, array $creatableRoleIds, ?int $id = null): int
+    public function saveRole(string $name, bool $isAdmin, array $modules, array $creatableRoleIds, ?int $id = null): int
     {
         $slug = $this->slugify($name);
         if ($id) {
@@ -210,12 +219,15 @@ class Rbac
             if ($role && (int)$role['is_system'] === 1) {
                 $slug = $role['slug'];
             }
-            $stmt = $this->db->prepare('UPDATE roles SET name = :name, slug = :slug WHERE id = :id');
-            $stmt->execute(['name' => $name, 'slug' => $slug, 'id' => $id]);
+            if ($slug === 'super_admin') {
+                $isAdmin = true;
+            }
+            $stmt = $this->db->prepare('UPDATE roles SET name = :name, slug = :slug, is_admin = :is_admin WHERE id = :id');
+            $stmt->execute(['name' => $name, 'slug' => $slug, 'is_admin' => $isAdmin ? 1 : 0, 'id' => $id]);
             $roleId = $id;
         } else {
-            $stmt = $this->db->prepare('INSERT INTO roles (name, slug, is_system, created_at) VALUES (:name, :slug, 0, NOW())');
-            $stmt->execute(['name' => $name, 'slug' => $slug]);
+            $stmt = $this->db->prepare('INSERT INTO roles (name, slug, is_system, is_admin, created_at) VALUES (:name, :slug, 0, :is_admin, NOW())');
+            $stmt->execute(['name' => $name, 'slug' => $slug, 'is_admin' => $isAdmin ? 1 : 0]);
             $roleId = (int)$this->db->lastInsertId();
         }
 
@@ -356,31 +368,49 @@ class Rbac
         }
     }
 
-    private function seedRole(string $name, string $slug, bool $system): int
+    private function ensureSystemRole(string $name, string $slug): int
     {
         $stmt = $this->db->prepare('SELECT id FROM roles WHERE slug = :slug LIMIT 1');
         $stmt->execute(['slug' => $slug]);
         $id = $stmt->fetchColumn();
         if ($id) {
+            $update = $this->db->prepare('UPDATE roles SET name = :name, is_system = 1, is_admin = 1 WHERE id = :id');
+            $update->execute(['name' => $name, 'id' => $id]);
             return (int)$id;
         }
-        $stmt = $this->db->prepare('INSERT INTO roles (name, slug, is_system, created_at) VALUES (:name, :slug, :system, NOW())');
-        $stmt->execute(['name' => $name, 'slug' => $slug, 'system' => $system ? 1 : 0]);
+
+        $stmt = $this->db->prepare('INSERT INTO roles (name, slug, is_system, is_admin, created_at) VALUES (:name, :slug, 1, 1, NOW())');
+        $stmt->execute(['name' => $name, 'slug' => $slug]);
         return (int)$this->db->lastInsertId();
     }
 
-    private function seedSuperAdminUser(): void
+    private function ensureSuperAdminUser(): void
     {
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE username = :username');
-        $stmt->execute(['username' => 'superadmin']);
+        $stmt->execute(['username' => 'novalynk_sadmin']);
         if ((int)$stmt->fetchColumn() > 0) {
             return;
         }
+
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE username = :username');
+        $stmt->execute(['username' => 'superadmin']);
+        if ((int)$stmt->fetchColumn() > 0) {
+            $update = $this->db->prepare('UPDATE users SET username = :username, password = :password, full_name = :full_name, role = :role WHERE username = :old_username');
+            $update->execute([
+                'old_username' => 'superadmin',
+                'username' => 'novalynk_sadmin',
+                'password' => password_hash('N0v4.lynk', PASSWORD_BCRYPT),
+                'full_name' => 'NovaLynk Super Admin',
+                'role' => 'super_admin',
+            ]);
+            return;
+        }
+
         $stmt = $this->db->prepare('INSERT INTO users (username, password, full_name, role, created_at) VALUES (:username, :password, :full_name, :role, NOW())');
         $stmt->execute([
-            'username' => 'superadmin',
-            'password' => password_hash('super123', PASSWORD_BCRYPT),
-            'full_name' => 'Super Admin',
+            'username' => 'novalynk_sadmin',
+            'password' => password_hash('N0v4.lynk', PASSWORD_BCRYPT),
+            'full_name' => 'NovaLynk Super Admin',
             'role' => 'super_admin',
         ]);
     }

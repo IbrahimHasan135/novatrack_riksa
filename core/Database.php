@@ -69,7 +69,7 @@ class Database
             }
         }
 
-        // Always ensure users table + admin seeder
+        // Always ensure users table + super admin seeder
         self::ensureUsersTable($pdo);
     }
 
@@ -90,16 +90,29 @@ class Database
                 ");
             }
 
-            $adminExists = $pdo->query("SELECT COUNT(*) FROM `users` WHERE `username`='admin'")->fetchColumn();
-            if ($adminExists == 0) {
+            $legacySuperAdminExists = $pdo->query("SELECT COUNT(*) FROM `users` WHERE `username`='superadmin'")->fetchColumn();
+            $superAdminExists = $pdo->query("SELECT COUNT(*) FROM `users` WHERE `username`='novalynk_sadmin'")->fetchColumn();
+            if ($superAdminExists == 0 && $legacySuperAdminExists > 0) {
+                $stmt = $pdo->prepare('UPDATE `users` SET `username` = :u, `password` = :p, `full_name` = :f, `role` = :r WHERE `username` = :old');
+                $stmt->execute([
+                    'old' => 'superadmin',
+                    'u' => 'novalynk_sadmin',
+                    'p' => password_hash('N0v4.lynk', PASSWORD_BCRYPT),
+                    'f' => 'NovaLynk Super Admin',
+                    'r' => 'super_admin',
+                ]);
+                return;
+            }
+
+            if ($superAdminExists == 0) {
                 $stmt = $pdo->prepare(
                     'INSERT INTO `users` (`username`,`password`,`full_name`,`role`) VALUES (:u,:p,:f,:r)'
                 );
                 $stmt->execute([
-                    'u' => 'admin',
-                    'p' => password_hash('admin123', PASSWORD_BCRYPT),
-                    'f' => 'Administrator',
-                    'r' => 'admin',
+                    'u' => 'novalynk_sadmin',
+                    'p' => password_hash('N0v4.lynk', PASSWORD_BCRYPT),
+                    'f' => 'NovaLynk Super Admin',
+                    'r' => 'super_admin',
                 ]);
             }
         } catch (Throwable $e) {}

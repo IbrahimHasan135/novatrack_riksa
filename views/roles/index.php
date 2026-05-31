@@ -15,6 +15,7 @@ require __DIR__ . '/../layout/header.php';
                 <h2>Create Role</h2>
                 <label for="role_name">Role Name</label>
                 <input id="role_name" name="name" required placeholder="Contoh: Admin Sales">
+                <label class="check-line"><input type="checkbox" name="is_admin" value="1"> Admin role: bisa melihat semua pekerjaan di module yang diizinkan</label>
                 <label>Allowed Modules</label>
                 <div class="check-grid">
                     <?php foreach ($modules as $module): ?>
@@ -32,12 +33,13 @@ require __DIR__ . '/../layout/header.php';
             <div class="admin-card">
                 <h2>Roles</h2>
                 <table class="admin-table">
-                    <thead><tr><th>Role</th><th>Slug</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Role</th><th>Slug</th><th>Mode</th><th>Action</th></tr></thead>
                     <tbody>
                     <?php foreach ($roles as $role): ?>
                         <tr>
                             <td><?= htmlspecialchars($role['name']); ?> <?= (int)$role['is_system'] ? '<span class="tag">system</span>' : ''; ?></td>
                             <td><?= htmlspecialchars($role['slug']); ?></td>
+                            <td><?= (int)($role['is_admin'] ?? 0) ? '<span class="tag">admin</span>' : '<span class="tag">assigned only</span>'; ?></td>
                             <td>
                                 <a href="<?= app_url('roles/edit/' . (int)$role['id']); ?>">Edit</a>
                                 <form action="<?= app_url('roles/delete/' . (int)$role['id']); ?>" method="POST" onsubmit="return confirm('Hapus role ini?');">

@@ -382,10 +382,6 @@ class CasesController
         $this->addColumnIfMissing('cases', 'information', 'TEXT AFTER personal_note');
         $this->addColumnIfMissing('cases', 'assigned_user_ids', 'JSON NULL AFTER reporter_id');
 
-        $defaultTypeId = $this->findOrCreateType('General');
-        $stmt = $this->db->prepare('UPDATE cases SET type_id = :type_id WHERE type_id IS NULL OR type_id = 0');
-        $stmt->execute(['type_id' => $defaultTypeId]);
-
         $this->db->exec("UPDATE cases SET status = 'verification' WHERE status = 'open'");
         $this->db->exec("UPDATE cases SET status = 'in_progress' WHERE status = 'process'");
     }

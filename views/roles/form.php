@@ -11,6 +11,7 @@ require __DIR__ . '/../layout/header.php';
             <h1>Edit <?= htmlspecialchars($role['name']); ?></h1>
             <label>Role Name</label>
             <input name="name" required value="<?= htmlspecialchars($role['name']); ?>">
+            <label class="check-line"><input type="checkbox" name="is_admin" value="1" <?= (int)($role['is_admin'] ?? 0) ? 'checked' : ''; ?>> Admin role: bisa melihat semua pekerjaan di module yang diizinkan</label>
             <label>Allowed Modules</label>
             <div class="check-grid">
                 <?php foreach ($modules as $module): ?>

@@ -119,7 +119,6 @@ class SalesModuleMeta extends ModuleMeta
                 $db->exec($schema);
             }
             $this->addColumnIfMissing($db, 'sales_leads', 'service_id', 'INT NULL AFTER source');
-            $this->seedServices($db);
         } catch (Throwable $e) {
         }
     }
@@ -133,24 +132,6 @@ class SalesModuleMeta extends ModuleMeta
         }
     }
 
-    private function seedServices(PDO $db): void
-    {
-        $samples = [
-            ['Pendirian PT / CV', 'Corporate Setup', 7500000, '7-14 hari'],
-            ['OSS / NIB / Perizinan Usaha', 'Licensing', 5000000, '5-21 hari'],
-            ['Legal Audit', 'Audit & Compliance', 15000000, '14-30 hari'],
-            ['Contract Drafting & Review', 'Legal Drafting', 3500000, '3-10 hari'],
-            ['Compliance Advisory', 'Audit & Compliance', 10000000, '14-30 hari'],
-        ];
-        $exists = $db->prepare('SELECT COUNT(*) FROM sales_services WHERE name = :name');
-        $insert = $db->prepare('INSERT INTO sales_services (name, category, base_price, estimated_duration, required_documents, description, created_at) VALUES (:name, :category, :base_price, :estimated_duration, "", "", NOW())');
-        foreach ($samples as $row) {
-            $exists->execute(['name' => $row[0]]);
-            if ((int)$exists->fetchColumn() === 0) {
-                $insert->execute(['name' => $row[0], 'category' => $row[1], 'base_price' => $row[2], 'estimated_duration' => $row[3]]);
-            }
-        }
-    }
 }
 
 return new SalesModuleMeta();

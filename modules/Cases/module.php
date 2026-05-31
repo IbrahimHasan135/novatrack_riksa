@@ -157,34 +157,6 @@ class CasesModuleMeta extends ModuleMeta
         try {
             $db = Database::connection();
             $this->ensureSchema($db);
-
-            $count = (int)$db->query('SELECT COUNT(*) FROM cases')->fetchColumn();
-            if ($count > 0) {
-                return;
-            }
-
-            $samples = [
-                ['Infrastructure', 'Gangguan jaringan lantai 3', 'Jaringan lambat dan putus-putus.', 'critical', 'verification'],
-                ['Office Support', 'Kerusakan printer management', 'Printer tidak bisa print dokumen penting.', 'medium', 'in_progress'],
-                ['Security', 'Akses VPN tidak bisa connect', 'Beberapa karyawan tidak bisa akses VPN.', 'critical', 'verification'],
-                ['Database', 'Backup database rutin mingguan', 'Backup otomatis perlu dijalankan.', 'normal', 'done'],
-            ];
-
-            $stmt = $db->prepare(
-                'INSERT INTO cases (type_id,title,description,priority,status,deadline,personal_note,information,created_at)
-                 VALUES (:type_id,:title,:description,:priority,:status,DATE_ADD(CURDATE(), INTERVAL 7 DAY),:personal_note,:information,NOW())'
-            );
-            foreach ($samples as $row) {
-                $stmt->execute([
-                    'type_id' => $this->findOrCreateType($db, $row[0]),
-                    'title' => $row[1],
-                    'description' => $row[2],
-                    'priority' => $row[3],
-                    'status' => $row[4],
-                    'personal_note' => 'Catatan internal awal untuk tim.',
-                    'information' => 'Informasi detail awal case.',
-                ]);
-            }
         } catch (Throwable $e) {
         }
     }
@@ -203,9 +175,6 @@ class CasesModuleMeta extends ModuleMeta
         $this->addColumnIfMissing($db, 'cases', 'personal_note', 'TEXT AFTER `deadline`');
         $this->addColumnIfMissing($db, 'cases', 'information', 'TEXT AFTER `personal_note`');
 
-        $generalId = $this->findOrCreateType($db, 'General');
-        $stmt = $db->prepare('UPDATE cases SET type_id = :type_id WHERE type_id IS NULL OR type_id = 0');
-        $stmt->execute(['type_id' => $generalId]);
         $db->exec("UPDATE cases SET status = 'verification' WHERE status = 'open'");
         $db->exec("UPDATE cases SET status = 'in_progress' WHERE status = 'process'");
     }
@@ -219,19 +188,6 @@ class CasesModuleMeta extends ModuleMeta
         }
     }
 
-    private function findOrCreateType(PDO $db, string $name): int
-    {
-        $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9]+/', '-', $name), '-'));
-        $stmt = $db->prepare('SELECT id FROM case_types WHERE slug = :slug LIMIT 1');
-        $stmt->execute(['slug' => $slug]);
-        $id = $stmt->fetchColumn();
-        if ($id) {
-            return (int)$id;
-        }
-        $stmt = $db->prepare('INSERT INTO case_types (name, slug, created_at) VALUES (:name, :slug, NOW())');
-        $stmt->execute(['name' => $name, 'slug' => $slug]);
-        return (int)$db->lastInsertId();
-    }
 }
 
 return new CasesModuleMeta();

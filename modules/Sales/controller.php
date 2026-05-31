@@ -4,11 +4,13 @@ use Core\Database;
 use Core\EventBus;
 use Core\Module;
 use Core\Rbac;
+use Core\Auth;
 
 class SalesController
 {
     private PDO $db;
     private Rbac $rbac;
+    private ?array $user;
 
     private array $leadStatuses = ['new', 'contacted', 'qualified', 'unqualified'];
     private array $stages = ['inquiry', 'qualification', 'consultation', 'proposal', 'negotiation', 'won', 'lost'];
@@ -18,6 +20,7 @@ class SalesController
     {
         $this->db = Database::connection();
         $this->rbac = new Rbac($this->db);
+        $this->user = Auth::getInstance()->user();
         $this->ensureSchema();
     }
 
@@ -33,15 +36,18 @@ class SalesController
 
     public function leads(): void
     {
-        $rows = $this->db->query(
+        $stmt = $this->db->prepare(
             'SELECT l.*, s.name AS service_name, u.full_name AS assigned_name
              FROM sales_leads l
              LEFT JOIN sales_services s ON s.id = l.service_id
              LEFT JOIN users u ON u.id = l.assigned_user_id
+             WHERE ' . $this->scopeClause('l') . '
              ORDER BY l.created_at DESC
              LIMIT 100'
-        )->fetchAll();
-        $users = $this->rbac->allUsers();
+        );
+        $stmt->execute($this->scopeParams());
+        $rows = $stmt->fetchAll();
+        $users = $this->formUsers();
         $services = $this->servicesList();
         Module::renderView('Sales/views/leads', compact('rows', 'users', 'services'));
     }
@@ -50,25 +56,29 @@ class SalesController
     {
         $lead = $this->find('sales_leads', $id);
         if (!$lead) { $this->notFound('Lead tidak ditemukan'); return; }
-        $users = $this->rbac->allUsers();
+        if (!$this->canAccessAssignedRow($lead)) { http_response_code(403); echo '403 - Lead ini bukan milik Anda'; return; }
+        $users = $this->formUsers();
         $services = $this->servicesList();
         Module::renderView('Sales/views/lead_edit', compact('lead', 'users', 'services'));
     }
 
     public function opportunities(): void
     {
-        $rows = $this->db->query(
+        $stmt = $this->db->prepare(
             'SELECT o.*, s.name AS service_name, l.company_name AS lead_company, u.full_name AS assigned_name
              FROM sales_opportunities o
              LEFT JOIN sales_services s ON s.id = o.service_id
              LEFT JOIN sales_leads l ON l.id = o.lead_id
              LEFT JOIN users u ON u.id = o.assigned_user_id
+             WHERE ' . $this->scopeClause('o') . '
              ORDER BY FIELD(o.stage, "inquiry", "qualification", "consultation", "proposal", "negotiation", "won", "lost"), o.expected_close_date ASC, o.id DESC
              LIMIT 100'
-        )->fetchAll();
+        );
+        $stmt->execute($this->scopeParams());
+        $rows = $stmt->fetchAll();
         $leads = $this->simpleLeads();
         $services = $this->servicesList();
-        $users = $this->rbac->allUsers();
+        $users = $this->formUsers();
         Module::renderView('Sales/views/opportunities', compact('rows', 'leads', 'services', 'users'));
     }
 
@@ -76,9 +86,10 @@ class SalesController
     {
         $opportunity = $this->find('sales_opportunities', $id);
         if (!$opportunity) { $this->notFound('Opportunity tidak ditemukan'); return; }
+        if (!$this->canAccessAssignedRow($opportunity)) { http_response_code(403); echo '403 - Opportunity ini bukan milik Anda'; return; }
         $leads = $this->simpleLeads();
         $services = $this->servicesList();
-        $users = $this->rbac->allUsers();
+        $users = $this->formUsers();
         Module::renderView('Sales/views/opportunity_edit', compact('opportunity', 'leads', 'services', 'users'));
     }
 
@@ -97,18 +108,21 @@ class SalesController
 
     public function followups(): void
     {
-        $rows = $this->db->query(
+        $stmt = $this->db->prepare(
             'SELECT f.*, l.company_name, o.title AS opportunity_title, u.full_name AS assigned_name
              FROM sales_followups f
              LEFT JOIN sales_leads l ON l.id = f.lead_id
              LEFT JOIN sales_opportunities o ON o.id = f.opportunity_id
              LEFT JOIN users u ON u.id = f.assigned_user_id
+             WHERE ' . $this->scopeClause('f') . '
              ORDER BY COALESCE(f.next_followup_date, f.activity_date) ASC, f.id DESC
              LIMIT 120'
-        )->fetchAll();
+        );
+        $stmt->execute($this->scopeParams());
+        $rows = $stmt->fetchAll();
         $leads = $this->simpleLeads();
         $opportunities = $this->simpleOpportunities();
-        $users = $this->rbac->allUsers();
+        $users = $this->formUsers();
         Module::renderView('Sales/views/followups', compact('rows', 'leads', 'opportunities', 'users'));
     }
 
@@ -116,24 +130,25 @@ class SalesController
     {
         $followup = $this->find('sales_followups', $id);
         if (!$followup) { $this->notFound('Follow-up tidak ditemukan'); return; }
+        if (!$this->canAccessAssignedRow($followup)) { http_response_code(403); echo '403 - Follow-up ini bukan milik Anda'; return; }
         $leads = $this->simpleLeads();
         $opportunities = $this->simpleOpportunities();
-        $users = $this->rbac->allUsers();
+        $users = $this->formUsers();
         Module::renderView('Sales/views/followup_edit', compact('followup', 'leads', 'opportunities', 'users'));
     }
 
     public function storeLead(): void { $this->saveLead(); header('Location: ' . app_url('sales/leads?created=1')); }
     public function updateLead(int $id): void { $this->saveLead($id); header('Location: ' . app_url('sales/leads?updated=1')); }
-    public function deleteLead(int $id): void { $this->delete('sales_leads', $id); header('Location: ' . app_url('sales/leads?deleted=1')); }
+    public function deleteLead(int $id): void { $this->deleteAssigned('sales_leads', $id, 'sales/leads'); }
     public function storeOpportunity(): void { $this->saveOpportunity(); header('Location: ' . app_url('sales/opportunities?created=1')); }
     public function updateOpportunity(int $id): void { $this->saveOpportunity($id); header('Location: ' . app_url('sales/opportunities?updated=1')); }
-    public function deleteOpportunity(int $id): void { $this->delete('sales_opportunities', $id); header('Location: ' . app_url('sales/opportunities?deleted=1')); }
+    public function deleteOpportunity(int $id): void { $this->deleteAssigned('sales_opportunities', $id, 'sales/opportunities'); }
     public function storeService(): void { $this->saveService(); header('Location: ' . app_url('sales/services?created=1')); }
     public function updateService(int $id): void { $this->saveService($id); header('Location: ' . app_url('sales/services?updated=1')); }
     public function deleteService(int $id): void { $this->delete('sales_services', $id); header('Location: ' . app_url('sales/services?deleted=1')); }
     public function storeFollowup(): void { $this->saveFollowup(); header('Location: ' . app_url('sales/followups?created=1')); }
     public function updateFollowup(int $id): void { $this->saveFollowup($id); header('Location: ' . app_url('sales/followups?updated=1')); }
-    public function deleteFollowup(int $id): void { $this->delete('sales_followups', $id); header('Location: ' . app_url('sales/followups?deleted=1')); }
+    public function deleteFollowup(int $id): void { $this->deleteAssigned('sales_followups', $id, 'sales/followups'); }
 
     public function dashboardCard(): string
     {
@@ -157,11 +172,15 @@ class SalesController
             'need_category' => trim($_POST['need_category'] ?? ''),
             'estimated_value' => $this->money($_POST['estimated_value'] ?? 0),
             'status' => in_array($_POST['status'] ?? 'new', $this->leadStatuses, true) ? $_POST['status'] : 'new',
-            'assigned_user_id' => (int)($_POST['assigned_user_id'] ?? 0) ?: null,
+            'assigned_user_id' => $this->assignedUserInput(),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
         if ($id) {
             $data['id'] = $id;
+            $current = $this->find('sales_leads', $id);
+            if (!$current || !$this->canAccessAssignedRow($current)) {
+                http_response_code(403); echo '403 - Lead ini bukan milik Anda'; exit;
+            }
             $stmt = $this->db->prepare('UPDATE sales_leads SET company_name=:company_name,pic_name=:pic_name,phone=:phone,email=:email,source=:source,service_id=:service_id,need_category=:need_category,estimated_value=:estimated_value,status=:status,assigned_user_id=:assigned_user_id,notes=:notes,updated_at=NOW() WHERE id=:id');
         } else {
             $stmt = $this->db->prepare('INSERT INTO sales_leads (company_name,pic_name,phone,email,source,service_id,need_category,estimated_value,status,assigned_user_id,notes,created_at) VALUES (:company_name,:pic_name,:phone,:email,:source,:service_id,:need_category,:estimated_value,:status,:assigned_user_id,:notes,NOW())');
@@ -237,12 +256,15 @@ class SalesController
             'probability' => max(0, min(100, (int)($_POST['probability'] ?? 25))),
             'expected_close_date' => ($_POST['expected_close_date'] ?? '') ?: null,
             'next_followup_date' => ($_POST['next_followup_date'] ?? '') ?: null,
-            'assigned_user_id' => (int)($_POST['assigned_user_id'] ?? 0) ?: null,
+            'assigned_user_id' => $this->assignedUserInput(),
             'lost_reason' => trim($_POST['lost_reason'] ?? ''),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
         if ($id) {
             $data['id'] = $id;
+            if (!$old || !$this->canAccessAssignedRow($old)) {
+                http_response_code(403); echo '403 - Opportunity ini bukan milik Anda'; exit;
+            }
             $stmt = $this->db->prepare('UPDATE sales_opportunities SET lead_id=:lead_id,service_id=:service_id,title=:title,client_name=:client_name,stage=:stage,deal_value=:deal_value,probability=:probability,expected_close_date=:expected_close_date,next_followup_date=:next_followup_date,assigned_user_id=:assigned_user_id,lost_reason=:lost_reason,notes=:notes,updated_at=NOW() WHERE id=:id');
         } else {
             $stmt = $this->db->prepare('INSERT INTO sales_opportunities (lead_id,service_id,title,client_name,stage,deal_value,probability,expected_close_date,next_followup_date,assigned_user_id,lost_reason,notes,created_at) VALUES (:lead_id,:service_id,:title,:client_name,:stage,:deal_value,:probability,:expected_close_date,:next_followup_date,:assigned_user_id,:lost_reason,:notes,NOW())');
@@ -289,11 +311,15 @@ class SalesController
             'result' => trim($_POST['result'] ?? ''),
             'next_action' => trim($_POST['next_action'] ?? ''),
             'next_followup_date' => ($_POST['next_followup_date'] ?? '') ?: null,
-            'assigned_user_id' => (int)($_POST['assigned_user_id'] ?? 0) ?: null,
+            'assigned_user_id' => $this->assignedUserInput(),
             'notes' => trim($_POST['notes'] ?? ''),
         ];
         if ($id) {
             $data['id'] = $id;
+            $current = $this->find('sales_followups', $id);
+            if (!$current || !$this->canAccessAssignedRow($current)) {
+                http_response_code(403); echo '403 - Follow-up ini bukan milik Anda'; exit;
+            }
             $stmt = $this->db->prepare('UPDATE sales_followups SET lead_id=:lead_id,opportunity_id=:opportunity_id,activity_type=:activity_type,activity_date=:activity_date,result=:result,next_action=:next_action,next_followup_date=:next_followup_date,assigned_user_id=:assigned_user_id,notes=:notes,updated_at=NOW() WHERE id=:id');
         } else {
             $stmt = $this->db->prepare('INSERT INTO sales_followups (lead_id,opportunity_id,activity_type,activity_date,result,next_action,next_followup_date,assigned_user_id,notes,created_at) VALUES (:lead_id,:opportunity_id,:activity_type,:activity_date,:result,:next_action,:next_followup_date,:assigned_user_id,:notes,NOW())');
@@ -304,33 +330,47 @@ class SalesController
     private function summary(): array
     {
         $month = date('Y-m-01');
-        $totalOpp = (float)$this->db->query('SELECT COALESCE(SUM(deal_value),0) FROM sales_opportunities WHERE stage NOT IN ("lost")')->fetchColumn();
-        $wonMonth = $this->sum('sales_opportunities', 'deal_value', 'stage = "won" AND updated_at >= :start', ['start' => $month]);
-        $leadsMonth = $this->countWhere('sales_leads', 'created_at >= :start', ['start' => $month]);
-        $wonCount = $this->countWhere('sales_opportunities', 'stage = "won"', []);
-        $closedCount = $this->countWhere('sales_opportunities', 'stage IN ("won","lost")', []);
+        $oppScope = $this->scopeClause();
+        $leadScope = $this->scopeClause();
+        $params = $this->scopeParams();
+
+        $stmt = $this->db->prepare('SELECT COALESCE(SUM(deal_value),0) FROM sales_opportunities WHERE stage NOT IN ("lost") AND ' . $oppScope);
+        $stmt->execute($params);
+        $totalOpp = (float)$stmt->fetchColumn();
+
+        $wonMonth = $this->sum('sales_opportunities', 'deal_value', 'stage = "won" AND updated_at >= :start AND ' . $oppScope, ['start' => $month] + $params);
+        $leadsMonth = $this->countWhere('sales_leads', 'created_at >= :start AND ' . $leadScope, ['start' => $month] + $params);
+        $wonCount = $this->countWhere('sales_opportunities', 'stage = "won" AND ' . $oppScope, $params);
+        $closedCount = $this->countWhere('sales_opportunities', 'stage IN ("won","lost") AND ' . $oppScope, $params);
         return [
             'leads_month' => $leadsMonth,
             'pipeline_value' => $totalOpp,
             'won_month' => $wonMonth,
             'conversion_rate' => $closedCount > 0 ? round(($wonCount / $closedCount) * 100, 1) : 0,
-            'followups_due' => $this->countWhere('sales_followups', 'next_followup_date IS NOT NULL AND next_followup_date <= CURDATE()', []),
+            'followups_due' => $this->countWhere('sales_followups', 'next_followup_date IS NOT NULL AND next_followup_date <= CURDATE() AND ' . $this->scopeClause(), $params),
         ];
     }
 
     private function pipelineStats(): array
     {
-        return $this->db->query('SELECT stage, COUNT(*) AS total, COALESCE(SUM(deal_value),0) AS value FROM sales_opportunities GROUP BY stage ORDER BY FIELD(stage, "inquiry","qualification","consultation","proposal","negotiation","won","lost")')->fetchAll();
+        $stmt = $this->db->prepare('SELECT stage, COUNT(*) AS total, COALESCE(SUM(deal_value),0) AS value FROM sales_opportunities WHERE ' . $this->scopeClause() . ' GROUP BY stage ORDER BY FIELD(stage, "inquiry","qualification","consultation","proposal","negotiation","won","lost")');
+        $stmt->execute($this->scopeParams());
+        return $stmt->fetchAll();
     }
 
     private function topLeadSources(): array
     {
-        return $this->db->query('SELECT COALESCE(NULLIF(source, ""), "Unknown") AS source, COUNT(*) AS total, COALESCE(SUM(estimated_value),0) AS value FROM sales_leads GROUP BY COALESCE(NULLIF(source, ""), "Unknown") ORDER BY total DESC LIMIT 6')->fetchAll();
+        $stmt = $this->db->prepare('SELECT COALESCE(NULLIF(source, ""), "Unknown") AS source, COUNT(*) AS total, COALESCE(SUM(estimated_value),0) AS value FROM sales_leads WHERE ' . $this->scopeClause() . ' GROUP BY COALESCE(NULLIF(source, ""), "Unknown") ORDER BY total DESC LIMIT 6');
+        $stmt->execute($this->scopeParams());
+        return $stmt->fetchAll();
     }
 
     private function upcomingFollowups(int $limit): array
     {
-        $stmt = $this->db->prepare('SELECT f.*, l.company_name, o.title AS opportunity_title FROM sales_followups f LEFT JOIN sales_leads l ON l.id=f.lead_id LEFT JOIN sales_opportunities o ON o.id=f.opportunity_id WHERE f.next_followup_date IS NOT NULL ORDER BY f.next_followup_date ASC LIMIT :limit');
+        $stmt = $this->db->prepare('SELECT f.*, l.company_name, o.title AS opportunity_title FROM sales_followups f LEFT JOIN sales_leads l ON l.id=f.lead_id LEFT JOIN sales_opportunities o ON o.id=f.opportunity_id WHERE f.next_followup_date IS NOT NULL AND ' . $this->scopeClause('f') . ' ORDER BY f.next_followup_date ASC LIMIT :limit');
+        foreach ($this->scopeParams() as $key => $value) {
+            $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
+        }
         $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
@@ -338,15 +378,74 @@ class SalesController
 
     private function recentLeads(int $limit): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM sales_leads ORDER BY created_at DESC LIMIT :limit');
+        $stmt = $this->db->prepare('SELECT * FROM sales_leads WHERE ' . $this->scopeClause() . ' ORDER BY created_at DESC LIMIT :limit');
+        foreach ($this->scopeParams() as $key => $value) {
+            $stmt->bindValue(':' . $key, $value, PDO::PARAM_INT);
+        }
         $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
-    private function simpleLeads(): array { return $this->db->query('SELECT id, company_name FROM sales_leads ORDER BY company_name ASC')->fetchAll(); }
-    private function simpleOpportunities(): array { return $this->db->query('SELECT id, title FROM sales_opportunities ORDER BY title ASC')->fetchAll(); }
+    private function simpleLeads(): array
+    {
+        $stmt = $this->db->prepare('SELECT id, company_name FROM sales_leads WHERE ' . $this->scopeClause() . ' ORDER BY company_name ASC');
+        $stmt->execute($this->scopeParams());
+        return $stmt->fetchAll();
+    }
+
+    private function simpleOpportunities(): array
+    {
+        $stmt = $this->db->prepare('SELECT id, title FROM sales_opportunities WHERE ' . $this->scopeClause() . ' ORDER BY title ASC');
+        $stmt->execute($this->scopeParams());
+        return $stmt->fetchAll();
+    }
     private function servicesList(): array { return $this->db->query('SELECT id, name, base_price FROM sales_services ORDER BY name ASC')->fetchAll(); }
+
+    private function canViewAllSales(): bool
+    {
+        return $this->rbac->canViewAllForModule('sales', $this->user);
+    }
+
+    private function userId(): int
+    {
+        return (int)($this->user['id'] ?? 0);
+    }
+
+    private function scopeClause(string $alias = ''): string
+    {
+        if ($this->canViewAllSales()) {
+            return '1=1';
+        }
+        $prefix = $alias !== '' ? $alias . '.' : '';
+        return $prefix . 'assigned_user_id = :scope_user_id';
+    }
+
+    private function scopeParams(): array
+    {
+        return $this->canViewAllSales() ? [] : ['scope_user_id' => $this->userId()];
+    }
+
+    private function canAccessAssignedRow(array $row): bool
+    {
+        return $this->canViewAllSales() || (int)($row['assigned_user_id'] ?? 0) === $this->userId();
+    }
+
+    private function assignedUserInput(): ?int
+    {
+        if ($this->canViewAllSales()) {
+            return (int)($_POST['assigned_user_id'] ?? 0) ?: null;
+        }
+        return $this->userId() ?: null;
+    }
+
+    private function formUsers(): array
+    {
+        if ($this->canViewAllSales()) {
+            return $this->rbac->allUsers();
+        }
+        return $this->user ? [$this->user] : [];
+    }
 
     private function findService(int $id): ?array
     {
@@ -368,6 +467,16 @@ class SalesController
     {
         $stmt = $this->db->prepare("DELETE FROM `$table` WHERE id = :id");
         $stmt->execute(['id' => $id]);
+    }
+
+    private function deleteAssigned(string $table, int $id, string $redirect): void
+    {
+        $row = $this->find($table, $id);
+        if (!$row || !$this->canAccessAssignedRow($row)) {
+            http_response_code(403); echo '403 - Data ini bukan milik Anda'; exit;
+        }
+        $this->delete($table, $id);
+        header('Location: ' . app_url($redirect . '?deleted=1'));
     }
 
     private function sum(string $table, string $column, string $where, array $params): float

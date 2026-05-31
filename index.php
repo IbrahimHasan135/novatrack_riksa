@@ -107,13 +107,13 @@ $router->get('roles/edit/{id}', function (int $id) use ($rbac, $registry) {
 
 $router->post('roles', function () use ($rbac) {
     if (!$rbac->canManageRoles()) { http_response_code(403); echo '403 - Forbidden'; return; }
-    $rbac->saveRole(trim($_POST['name'] ?? ''), $_POST['modules'] ?? [], $_POST['creatable_roles'] ?? []);
+    $rbac->saveRole(trim($_POST['name'] ?? ''), isset($_POST['is_admin']), $_POST['modules'] ?? [], $_POST['creatable_roles'] ?? []);
     header('Location: ' . app_url('roles?created=1'));
 });
 
 $router->post('roles/update/{id}', function (int $id) use ($rbac) {
     if (!$rbac->canManageRoles()) { http_response_code(403); echo '403 - Forbidden'; return; }
-    $rbac->saveRole(trim($_POST['name'] ?? ''), $_POST['modules'] ?? [], $_POST['creatable_roles'] ?? [], $id);
+    $rbac->saveRole(trim($_POST['name'] ?? ''), isset($_POST['is_admin']), $_POST['modules'] ?? [], $_POST['creatable_roles'] ?? [], $id);
     header('Location: ' . app_url('roles?updated=1'));
 });
 

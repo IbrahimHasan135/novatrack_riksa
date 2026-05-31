@@ -218,6 +218,29 @@
     flex-shrink: 0;
 }
 
+.check-line {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 14px !important;
+    background: #F7FAFD;
+    border: 1.5px solid #DDE8F4;
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #1C2B3A !important;
+}
+
+.check-line input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    accent-color: #1BA784;
+    flex-shrink: 0;
+}
+
 /* ════════════════════════════════════════════
    TABLE
 ════════════════════════════════════════════ */
